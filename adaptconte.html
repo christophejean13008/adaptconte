@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+<title>Adaptconte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Baloo+2:wght@600;800&display=swap">
+<style>
+/* Mise en page : une seule page-écran. En haut le chemin du conte (5 étapes), au centre la phrase qui se construit, en bas les 6 cartes à choisir. */
+:root{
+  --ciel:#e6f1ff; --papier:#ffffff; --encre:#1b2452; --doux:#5b6590; --trait:#c4d5ef;
+  --soleil:#ffc531; --soleil-fonce:#b97f00;
+  --nom:#2a6be0; --adj:#17935a; --verbe:#dc3d33; --comp:#c96a00; --name:#8346d4;
+  --corps:"Andika","Trebuchet MS","Segoe UI",sans-serif;
+  --titre:"Baloo 2","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--ciel);color:var(--encre);font-family:var(--corps);font-size:18px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+:focus-visible{outline:3px solid var(--name);outline-offset:2px}
+#app{height:100%;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:10px 14px;gap:10px}
+
+/* Chemin du conte */
+#chemin{display:flex;align-items:center;gap:8px}
+.rond{flex:none;width:46px;height:46px;border-radius:50%;border:2px solid var(--trait);background:var(--papier);font-size:20px;display:grid;place-items:center;padding:0}
+.etapes{flex:1;min-width:0;display:flex;gap:6px}
+.etape{flex:1;min-width:0;border:2px solid var(--trait);background:var(--papier);border-radius:14px;padding:4px 6px;display:flex;align-items:center;gap:6px;text-align:left;color:var(--doux)}
+.etape b{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ciel);display:grid;place-items:center;font-family:var(--titre);font-size:17px}
+.etape span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:700}
+.etape.fait b{background:var(--adj);color:#fff}
+.etape.ici{border-color:var(--encre);color:var(--encre);background:var(--soleil)}
+.etape.ici b{background:var(--encre);color:#fff}
+.etape:disabled{opacity:.5;cursor:default}
+@media (max-width:720px){.etape{justify-content:center}.etape span{display:none}}
+
+#vue>*{flex-shrink:0}
+.nb{white-space:nowrap}
+#vue{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:6px}
+h1,h2{font-family:var(--titre);margin:0;line-height:1.1;text-wrap:balance}
+.sur{font-size:15px;font-weight:700;color:var(--doux);letter-spacing:.04em;text-transform:uppercase;margin:0}
+
+/* Phrase en construction */
+.phrase{background:var(--papier);border-radius:20px;padding:14px 18px;font-size:clamp(20px,2.7vw,28px);line-height:2;border:2px solid var(--trait)}
+.phrase.grand{font-size:clamp(24px,3.4vw,36px);line-height:1.8}
+.chip{border:0;background:none;padding:0 4px;border-radius:8px;font-weight:700;border-bottom:4px solid currentColor}
+.k-nom{color:var(--nom)}.k-adj{color:var(--adj)}.k-verbe{color:var(--verbe)}.k-comp{color:var(--comp)}.k-name{color:var(--name)}
+.blank{font-weight:400;font-size:.62em;border:2px dashed currentColor;border-radius:10px;padding:4px 12px;vertical-align:middle;opacity:.75;background:var(--papier)}
+.blank.cur{opacity:1;background:var(--soleil);border-style:solid;color:var(--encre);font-weight:700;animation:pouls 1.2s ease-in-out infinite}
+.syl-a{color:#2a6be0}.syl-b{color:#dc3d33}
+@keyframes pouls{50%{transform:scale(1.08)}}
+
+/* Question et cartes */
+.q{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:clamp(22px,3vw,30px)}
+.tag{font-family:var(--corps);font-size:15px;font-weight:700;color:#fff;border-radius:99px;padding:3px 12px}
+.tag.k-nom{background:var(--nom)}.tag.k-adj{background:var(--adj)}.tag.k-verbe{background:var(--verbe)}.tag.k-comp{background:var(--comp)}.tag.k-name{background:var(--name)}
+.cartes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:560px){.cartes{grid-template-columns:repeat(2,1fr)}}
+.carte{position:relative;min-width:0;background:var(--papier);border:3px solid currentColor;border-radius:20px;padding:12px 8px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:112px;cursor:pointer;box-shadow:0 5px 0 currentColor;transition:transform .08s}
+.carte:active{transform:translateY(4px);box-shadow:0 1px 0 currentColor}
+.carte .em{font-size:44px;line-height:1.1}
+.carte .mot{color:var(--encre);font-size:clamp(19px,2.4vw,25px);font-weight:700;text-align:center;overflow-wrap:anywhere}
+.carte.sans .mot{font-size:clamp(22px,3vw,30px)}
+.ecoute{position:absolute;top:4px;right:4px;width:38px;height:38px;border-radius:50%;border:0;background:var(--ciel);font-size:17px;padding:0}
+.outils{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:2px solid var(--encre);background:var(--papier);border-radius:16px;padding:10px 18px;font-weight:700;font-size:18px;display:inline-flex;align-items:center;gap:8px;min-height:50px;cursor:pointer}
+.btn.fort{background:var(--soleil);box-shadow:0 4px 0 var(--soleil-fonce);font-size:21px;padding:12px 24px}
+.btn.fort:active{transform:translateY(3px);box-shadow:0 1px 0 var(--soleil-fonce)}
+.btn.choisi{background:var(--encre);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.champ{border:2px solid var(--encre);border-radius:14px;padding:10px 14px;font-size:20px;min-width:0;flex:1 1 180px;background:var(--papier)}
+.boite{background:var(--papier);border:2px dashed var(--trait);border-radius:18px;padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* Dés */
+.des{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;padding-block:6px}
+.de{width:clamp(92px,17vw,132px);aspect-ratio:1;border-radius:24px;border:3px solid var(--encre);background:var(--papier);box-shadow:0 7px 0 var(--encre);font-family:var(--titre);font-size:clamp(34px,6vw,52px);display:grid;place-items:center;padding:0}
+.de.roule{animation:roule .35s linear infinite}
+@keyframes roule{0%{transform:rotate(-9deg) translateY(0)}50%{transform:rotate(9deg) translateY(-12px)}100%{transform:rotate(-9deg) translateY(0)}}
+.nomde{text-align:center;font-family:var(--titre);font-size:clamp(40px,7vw,64px);min-height:1.2em;line-height:1.2}
+.centre{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+
+/* Accueil */
+.accueil{display:grid;gap:18px;padding-block:8px}
+.accueil h1{font-size:clamp(44px,8vw,76px)}
+.accueil h1 em{font-style:normal;color:var(--name)}
+.accueil p{margin:0;max-width:60ch}
+.plan{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:0;padding:0;list-style:none}
+@media (max-width:720px){.plan{grid-template-columns:1fr}}
+.plan li{background:var(--papier);border-radius:16px;padding:10px 12px;border:2px solid var(--trait);min-width:0}
+.plan b{font-family:var(--titre);font-size:20px;display:block}
+.plan i{font-style:normal;color:var(--name);font-weight:700;display:block}
+.plan small{color:var(--doux);font-size:14px}
+.adulte{border-top:2px solid var(--trait);padding-top:12px;display:grid;gap:8px}
+
+/* Film */
+.scene{position:relative;overflow:hidden;border-radius:24px;aspect-ratio:16/9;width:100%;max-width:760px;margin-inline:auto;font-size:clamp(46px,11vw,104px);border:3px solid var(--encre);background:#bfe3ff}
+.scene .e{position:absolute;line-height:1;bottom:9%}
+.scene img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;animation:zoom 9s ease-out both}
+.scene .carton{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:4px;padding:16px}
+.scene .carton span{font-size:1em;line-height:1.1}
+.scene .carton strong{font-family:var(--titre);font-size:.42em;line-height:1.1;color:var(--encre)}
+.s0{background:linear-gradient(#fff3c4,#ffd76a)}
+.s1{background:linear-gradient(#aedcff 60%,#9fd98a 60%)}
+.s2{background:linear-gradient(#8f93b8 60%,#77806f 60%)}
+.s3{background:linear-gradient(#c9ecc0 60%,#8fbf6c 60%)}
+.s4{background:linear-gradient(#ffe7a3 60%,#e9c15f 60%)}
+.s5{background:linear-gradient(#ffb98a,#ffd9a8 60%,#9fd98a 60%)}
+.pop{animation:pop .7s cubic-bezier(.3,1.6,.5,1) both}
+.bob{animation:pop .7s cubic-bezier(.3,1.6,.5,1) both,bob 1.4s ease-in-out .7s infinite}
+.gauche{animation:gauche 1.6s ease-out both}
+.droite{animation:droite 1.2s ease-out both}
+.vole{animation:vole 1.6s ease-in 1.5s both}
+.fuit{animation:fuit 1.4s ease-in 1.4s both}
+.brille{animation:brille 1.2s ease-in-out infinite}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes bob{50%{transform:translateY(-10%)}}
+@keyframes gauche{from{transform:translateX(-260%)}to{transform:none}}
+@keyframes droite{from{transform:translateX(260%)}to{transform:none}}
+@keyframes vole{to{transform:translate(170%,-60%) scale(.5) rotate(25deg)}}
+@keyframes fuit{to{transform:translate(120%,-120%) scale(0) rotate(540deg)}}
+@keyframes brille{50%{opacity:.25;transform:scale(.7)}}
+@keyframes zoom{from{transform:scale(1.12)}to{transform:scale(1)}}
+.legende{font-size:clamp(22px,3vw,30px);text-align:center;margin:0;min-height:3em;max-width:760px;margin-inline:auto}
+.legende span{opacity:.3;transition:opacity .2s}
+.legende span.on{opacity:1}
+.conte{background:var(--papier);border-radius:20px;border:2px solid var(--trait);padding:16px 20px;display:grid;gap:10px;font-size:20px}
+.conte h2{font-size:28px}
+.conte p{margin:0;max-width:65ch}
+.conte small{display:block;color:var(--doux);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+.vignette{height:64px;border-radius:10px;border:2px solid var(--encre)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <nav id="chemin" aria-label="Les étapes du conte"></nav>
+  <main id="vue"></main>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Banques de mots ---------- */
+const N=s=>s.split('|').map(x=>{const[w,g,e]=x.split(',');return{w,g,e}});
+const A=s=>s.split('|').map(x=>{const[m,f,pre]=x.split(',');return{m,f:f||m,pre:!!pre}});
+const Vb=s=>s.split('|').map(x=>{const[ps,pc,pr]=x.split(',');return{ps,pc:pc||ps,pr:pr||ps}});
+const C=s=>s.split('|').map(x=>{const[t,e]=x.split(',');return{t,e}});
+const B={
+ heros:N('dragon,m,🐉|princesse,f,👸|prince,m,🤴|chevalier,m,🤺|fée,f,🧚|magicien,m,🧙|sirène,f,🧜‍♀️|renard,m,🦊|loup,m,🐺|souris,f,🐭|robot,m,🤖|licorne,f,🦄|grenouille,f,🐸|chat,m,🐱|chouette,f,🦉|fille,f,👧|garçon,m,👦|lapin,m,🐰|tortue,f,🐢|lion,m,🦁'),
+ phys:A('petit,petite,1|grand,grande,1|gros,grosse,1|joli,jolie,1|minuscule|géant,géante|poilu,poilue|maigre|musclé,musclée|rapide|bleu,bleue|vert,verte|doré,dorée|tout rond,toute ronde'),
+ moral:A('courageux,courageuse|timide|malin,maligne|gentil,gentille|curieux,curieuse|grognon,grognonne|joyeux,joyeuse|rêveur,rêveuse|gourmand,gourmande|têtu,têtue|coquin,coquine|sage|peureux,peureuse|généreux,généreuse'),
+ verbe1:Vb('vivait|habitait|dormait|travaillait|jouait|chantait|se cachait|dansait|jardinait|cuisinait'),
+ lieu:C('dans la forêt,🌲|dans le château,🏰|sur l\'île,🏝️|dans la grotte,🪨|dans le village,🏘️|dans la ville,🏙️|sur la montagne,⛰️|dans le royaume,👑|dans le jardin,🌷|dans le désert,🏜️|au bord du lac,🏞️|dans la cabane,🛖'),
+ mechant:N('ogre,m,👹|sorcière,f,🧙‍♀️|monstre,m,👾|loup,m,🐺|voleur,m,🦹|dragon,m,🐲|araignée,f,🕷️|fantôme,m,👻|serpent,m,🐍|pirate,m,🏴‍☠️|troll,m,🧌|requin,m,🦈|vampire,m,🧛|crocodile,m,🐊'),
+ adjM:A('méchant,méchante|affreux,affreuse|terrible|énorme|rusé,rusée|affamé,affamée|jaloux,jalouse|cruel,cruelle|horrible|furieux,furieuse|géant,géante|poilu,poilue'),
+ verbe2:Vb('vola,a volé,vole|cassa,a cassé,casse|cacha,a caché,cache|emporta,a emporté,emporte|avala,a avalé,avale|jeta,a jeté,jette|brûla,a brûlé,brûle|arracha,a arraché,arrache|déchira,a déchiré,déchire|écrasa,a écrasé,écrase'),
+ objet:C('le trésor,💰|la couronne,👑|la clé magique,🗝️|le livre des secrets,📖|la baguette magique,🪄|l\'épée,⚔️|le gâteau,🎂|le doudou,🧸|le tambour,🥁|le chapeau,🎩|la lanterne,🏮|le bateau,⛵|le collier,📿|le ballon,⚽'),
+ verbe3:Vb('traversa,a traversé,traverse|explora,a exploré,explore|fouilla,a fouillé,fouille|visita,a visité,visite|survola,a survolé,survole|longea,a longé,longe'),
+ lieu3:N('forêt,f,🌲|désert,m,🏜️|montagne,f,⛰️|marais,m,🐊|rivière,f,🏞️|tunnel,m,🚇|grotte,f,🪨|jungle,f,🌴|océan,m,🌊|vallée,f,🌄|labyrinthe,m,🌀|volcan,m,🌋'),
+ adjL:A('sombre|brûlant,brûlante|glacé,glacée|puant,puante|profond,profonde|secret,secrète|mystérieux,mystérieuse|immense|dangereux,dangereuse|enchanté,enchantée|silencieux,silencieuse'),
+ ami:N('fée,f,🧚|lutin,m,🧝|oiseau,m,🐦|tortue,f,🐢|chouette,f,🦉|écureuil,m,🐿️|licorne,f,🦄|magicien,m,🧙|souris,f,🐭|abeille,f,🐝|cheval,m,🐴|baleine,f,🐋|papillon,m,🦋|singe,m,🐒'),
+ adjA:A('gentil,gentille|généreux,généreuse|drôle|sage|fidèle|malin,maligne|bavard,bavarde|minuscule|magique|rigolo,rigolote|courageux,courageuse'),
+ moyen:N('potion,f,🧪|épée,f,⚔️|corde,f,🪢|chanson,f,🎵|cape,f,🧥|bouclier,m,🛡️|piège,m,🪤|miroir,m,🪞|baguette,f,🪄|plume,f,🪶|clochette,f,🔔|gâteau,m,🍰|filet,m,🥅|bulle,f,🫧'),
+ adjMo:A('magique|puissant,puissante|géant,géante|invisible|doré,dorée|enchanté,enchantée|secret,secrète|brillant,brillante|solide|minuscule'),
+ verbe4:Vb('attrapa,a attrapé,attrape|chassa,a chassé,chasse|enferma,a enfermé,enferme|piégea,a piégé,piège|captura,a capturé,capture|effraya,a effrayé,effraie|arrêta,a arrêté,arrête|endormit,a endormi,endort|calma,a calmé,calme|repoussa,a repoussé,repousse'),
+ etat:A('heureux,heureuse|fier,fière|célèbre|tranquille|joyeux,joyeuse|riche|libre|content,contente|rassuré,rassurée'),
+ verbe5:Vb('chante|danse|joue|voyage|rit|fait la fête|se promène|dort|cuisine|jardine'),
+ ccl5:C('tous les jours,📅|chaque soir,🌙|sous les étoiles,✨|au soleil,☀️|au bord de l\'eau,🌊|dans son jardin,🌷|près du feu,🔥|sur son bateau,⛵|le dimanche,🎈|sous l\'arc-en-ciel,🌈')
+};
+const SYL='ma mi mo mu la li lo lu ra ri ro ru ta ti to tu na no sa si so va vi vo za zo da di do fa fi fo ba bo ka ki ko pa po lou mou cha chi bé lé mé né ré té'.split(' ');
+const INTERDIT=/nazi|sida|taré|raté|moru|nik|salo|kon|loli|koka|pabo|foli/;
+const FIXE={renc:{ps:'rencontra',pc:'a rencontré',pr:'rencontre'},retr:{ps:'retrouva',pc:'a retrouvé',pr:'retrouve'}};
+const ETAPES=[
+ {court:'Le début',nom:'Situation initiale',amorce:'Il était une fois…',aide:'Qui ? Où ?',slots:['heros','herosNom','phys','moral','verbe1','lieu','lieuNom']},
+ {court:'Le problème',nom:'Élément perturbateur',amorce:'Un jour…',aide:'Que se passe-t-il ?',slots:['mechant','adjM','verbe2','objet']},
+ {court:"L'aventure",nom:'Péripéties',amorce:'Alors…',aide:'Que fait le héros ?',slots:['verbe3','lieu3','adjL','ami','adjA']},
+ {court:'La solution',nom:'Résolution',amorce:'Enfin…',aide:'Comment ça s\'arrange ?',slots:['moyen','adjMo','verbe4']},
+ {court:'La fin',nom:'Situation finale',amorce:'Depuis ce jour…',aide:'Comment ça finit ?',slots:['etat','verbe5','ccl5']}
+];
+const KIND={nom:'un nom',adj:'un adjectif',verbe:'un verbe',comp:'un complément',name:'un nom propre'};
+const VIDE={nom:'nom',adj:'adjectif',verbe:'verbe',name:'Nom'};
+
+/* ---------- État ---------- */
+const CLE='adaptconte-v1';
+let T={S:{},photos:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
+try{const s=JSON.parse(localStorage.getItem(CLE)||'null');if(s&&s.S)T=Object.assign(T,s)}catch(e){}
+const sauve=()=>{try{localStorage.setItem(CLE,JSON.stringify(T))}catch(e){}};
+let OPT={slot:null,items:[]},DES={n:2,syl:[],roule:false},CG='m',F={i:0,playing:false,tok:0},confirme=false,libre=false;
+
+/* ---------- Grammaire ---------- */
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const voy=s=>/^[aeiouyàâéèêëîïôöûœ]/i.test(s||'');
+const un=g=>g==='f'?'une':'un';
+const le=(g,suite)=>voy(suite)?"l'":(g==='f'?'la':'le');
+const de=suite=>voy(suite)?"d'":'de';
+const acc=(a,g)=>g==='f'?a.f:a.m;
+const vt=v=>v[T.tense];
+const maj=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const hero=()=>T.S.heros||{w:'héros',g:'m',e:'🙂'};
+const pro=()=>hero().g==='f'?'elle':'il';
+const prenom=()=>(T.S.herosNom&&T.S.herosNom.t)||'ton héros';
+const leN=n=>{const d=le(n.g,n.w);return d+(d.endsWith("'")?'':' ')+n.w};
+const SL={
+ heros:{k:'nom',q:()=>'Qui est le héros de ton histoire ?'},
+ herosNom:{k:'name',q:()=>'Comment s\'appelle '+leN(hero())+' ?'},
+ phys:{k:'adj',of:'heros',q:()=>'Comment est son corps ?'},
+ moral:{k:'adj',of:'heros',q:()=>'Quel est son caractère ?'},
+ verbe1:{k:'verbe',q:()=>'Que faisait-'+pro()+' ?'},
+ lieu:{k:'comp',lab:'où ?',q:()=>'Où ?'},
+ lieuNom:{k:'name',opt:true,q:()=>'Comment s\'appelle cet endroit ?'},
+ mechant:{k:'nom',q:()=>'Qui arrive et pose un problème ?'},
+ adjM:{k:'adj',of:'mechant',q:()=>'Comment est '+leN(T.S.mechant)+' ?'},
+ verbe2:{k:'verbe',q:()=>'Que fait '+leN(T.S.mechant)+' ?'},
+ objet:{k:'comp',lab:'quoi ?',q:()=>'Quoi ?'},
+ verbe3:{k:'verbe',q:()=>'Que fait '+prenom()+' pour arranger le problème ?'},
+ lieu3:{k:'nom',det:'le',lab:'quoi ?',q:()=>'Quel endroit ?'},
+ adjL:{k:'adj',of:'lieu3',q:()=>'Comment est '+leN(T.S.lieu3)+' ?'},
+ ami:{k:'nom',q:()=>'Qui rencontre-t-'+pro()+' en chemin ?'},
+ adjA:{k:'adj',of:'ami',q:()=>'Comment est '+leN(T.S.ami)+' ?'},
+ moyen:{k:'nom',q:()=>'Quel objet va aider '+prenom()+' ?'},
+ adjMo:{k:'adj',of:'moyen',q:()=>'Comment est '+leN(T.S.moyen)+' ?'},
+ verbe4:{k:'verbe',q:()=>'Que fait '+prenom()+' ? ('+leN(T.S.mechant)+')'},
+ etat:{k:'adj',of:'heros',q:()=>'Comment se sent '+prenom()+' maintenant ?'},
+ verbe5:{k:'verbe',q:()=>'Que fait-'+pro()+' depuis ce jour ?'},
+ ccl5:{k:'comp',lab:'où ? quand ?',q:()=>'Où ou quand ?'}
+};
+function etiquette(id,it){
+  const d=SL[id];
+  if(d.k==='nom')return d.det==='le'?leN(it):un(it.g)+' '+it.w;
+  if(d.k==='adj')return acc(it,(T.S[d.of]||{g:'m'}).g);
+  if(d.k==='verbe')return vt(it);
+  return it.t;
+}
+/* Construit la phrase d'une étape : liste de morceaux (texte fixe, mot choisi, ou case vide). */
+function morceaux(n){
+  const S=T.S,p=[];
+  const t=x=>p.push({t:x}),g=x=>p.push({t:x,gl:1});
+  const vide=id=>p.push({b:1,s:id,k:SL[id].k});
+  const sl=id=>{S[id]===undefined?vide(id):p.push({t:etiquette(id,S[id]),s:id,k:SL[id].k})};
+  const nm=id=>{const v=S[id];if(v===undefined)return vide(id);if(v.t)p.push({t:v.t,syl:v.syl,s:id,k:'name'})};
+  const gn=(det,nid,aids,simple)=>{
+    const nn=S[nid];
+    if(!nn){vide(nid);aids.forEach(vide);return}
+    const fl=aids.filter(a=>S[a]).map(id=>({id,a:S[id]}));
+    const pre=fl.filter(x=>x.a.pre),post=fl.filter(x=>!x.a.pre);
+    const d=det==='un'?un(nn.g):le(nn.g,pre.length?acc(pre[0].a,nn.g):nn.w);
+    p.push({t:d,glue:d.endsWith("'")});
+    const mot=(txt,id,k)=>p.push(simple?{t:txt}:{t:txt,s:id,k});
+    pre.forEach(x=>mot(acc(x.a,nn.g),x.id,'adj'));
+    mot(nn.w,nid,'nom');
+    post.forEach((x,i)=>{if(i)t('et');mot(acc(x.a,nn.g),x.id,'adj')});
+    if(!simple)aids.filter(a=>!S[a]).forEach(vide);
+  };
+  const nomHero=()=>t(prenom());
+  if(n===0){
+    t('Il était une fois');gn('un','heros',['phys','moral']);t("qui s'appelait");nm('herosNom');g('.');
+    t(maj(pro()));sl('verbe1');sl('lieu');
+    if(S.lieuNom===undefined)vide('lieuNom');
+    else if(S.lieuNom.t){const d=de(S.lieuNom.t);p.push({t:d,glue:d.endsWith("'")});nm('lieuNom')}
+    g('.');
+  }else if(n===1){
+    t('Un jour,');gn('un','mechant',['adjM']);sl('verbe2');sl('objet');
+    const d=de(prenom());p.push({t:d,glue:d.endsWith("'")});nomHero();g('.');
+  }else if(n===2){
+    t('Alors,');nomHero();sl('verbe3');gn('le','lieu3',['adjL']);g('.');
+    t('En chemin,');t(pro());t(FIXE.renc[T.tense]);gn('un','ami',['adjA']);g('.');
+  }else if(n===3){
+    t('Enfin, grâce à');gn('un','moyen',['adjMo']);g(',');nomHero();sl('verbe4');
+    if(S.mechant)gn('le','mechant',[],true);
+    t('et');t(FIXE.retr[T.tense]);if(S.objet)t(S.objet.t);g('.');
+  }else{
+    t('Depuis ce jour,');nomHero();t('est');sl('etat');g('.');
+    t(maj(pro()));sl('verbe5');sl('ccl5');
+    if(S.ami){t('avec');gn('le','ami',['adjA'],true)}
+    g('.');
+  }
+  return p;
+}
+function assemble(ps,rendu){let o='',glue=true;ps.forEach(p=>{if(!glue&&!p.gl)o+=' ';o+=rendu(p);glue=!!p.glue});return o}
+const texte=n=>assemble(morceaux(n).filter(p=>!p.b),p=>p.t);
+function sylHtml(p){return p.syl?p.syl.map((s,i)=>'<span class="syl-'+(i%2?'b':'a')+'">'+esc(i?s:maj(s))+'</span>').join(''):esc(p.t)}
+function phraseHtml(n,cur){
+  const o=[];let glue=false;
+  morceaux(n).forEach(p=>{
+    let h;
+    if(p.b)h='<button class="chip blank k-'+p.k+(p.s===cur?' cur':'')+'" data-a="slot" data-s="'+p.s+'">'+(SL[p.s].lab||VIDE[p.k])+'</button>';
+    else if(p.s)h='<button class="chip k-'+p.k+'" data-a="slot" data-s="'+p.s+'" title="Changer ce mot">'+sylHtml(p)+'</button>';
+    else h=esc(p.t);
+    if(o.length&&(p.gl||glue))o[o.length-1]='<span class="nb">'+o[o.length-1]+h+'</span>';
+    else o.push(h);
+    glue=!!p.glue;
+  });
+  return o.join(' ');
+}
+const complet=n=>ETAPES[n].slots.every(id=>T.S[id]!==undefined);
+const toutFini=()=>ETAPES.every((e,i)=>complet(i));
+const titre=()=>{const n=prenom();const d=de(n);return "L'histoire "+d+(d.endsWith("'")?'':' ')+n};
+
+/* ---------- Voix ---------- */
+function dis(txt,fin){
+  let fait=false;const ok=()=>{if(!fait){fait=true;fin&&fin()}};
+  if(!T.voice||!('speechSynthesis' in window))return ok();
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';u.rate=.85;
+    const v=speechSynthesis.getVoices().find(v=>/^fr/i.test(v.lang));if(v)u.voice=v;
+    u.onend=ok;u.onerror=ok;speechSynthesis.speak(u);
+    if(fin)setTimeout(ok,txt.length*120+4000);
+  }catch(e){ok()}
+}
+const tais=()=>{try{speechSynthesis.cancel()}catch(e){}};
+
+/* ---------- Rendu ---------- */
+const vue=document.getElementById('vue'),chemin=document.getElementById('chemin');
+function melange(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function rendChemin(){
+  let h='<button class="rond" data-a="home" aria-label="Accueil">🏠</button><div class="etapes">';
+  ETAPES.forEach((e,i)=>{
+    const ok=i===0||complet(i-1),ici=T.view!=='home'&&T.view!=='film'&&T.step===i;
+    h+='<button class="etape'+(complet(i)?' fait':'')+(ici?' ici':'')+'" data-a="step" data-n="'+i+'"'+(ok?'':' disabled')+' title="'+e.nom+'"><b>'+(complet(i)&&!ici?'✓':i+1)+'</b><span>'+e.court+'</span></button>';
+  });
+  h+='<button class="etape'+(T.view==='film'?' ici':'')+'" data-a="film"'+(toutFini()?'':' disabled')+' title="Mon histoire animée"><b>🎬</b><span>Mon film</span></button></div>';
+  h+='<button class="rond" data-a="voix" aria-label="Voix">'+(T.voice?'🔊':'🔇')+'</button>';
+  chemin.innerHTML=h;
+}
+function rend(){
+  F.tok++;F.playing=false;
+  rendChemin();
+  if(T.view==='home')rendAccueil();
+  else if(T.view==='build')rendChoix();
+  else if(T.view==='recap')rendBilan();
+  else rendFilm();
+  sauve();
+}
+function rendAccueil(){
+  const encours=Object.keys(T.S).length>0;
+  let h='<section class="accueil"><h1>Adapt<em>conte</em></h1><p>Invente ton conte en 5 étapes. À chaque étape, tu choisis des mots et ta phrase se construit.</p><ol class="plan">';
+  ETAPES.forEach((e,i)=>{h+='<li><b>'+(i+1)+'. '+e.court+'</b><i>'+e.amorce+'</i><small>'+e.nom+'</small></li>'});
+  h+='</ol><div class="outils">';
+  if(encours)h+='<button class="btn fort" data-a="reprendre">▶ Continuer mon histoire</button>';
+  if(!confirme)h+='<button class="btn'+(encours?'':' fort')+'" data-a="neuf">✨ Nouvelle histoire</button>';
+  else h+='<span class="boite">Effacer l\'histoire en cours ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
+  h+='</div><div class="adulte"><p class="sur">Réglage pour l\'adulte : temps du récit</p><div class="outils">';
+  [['ps','passé simple (il vola)'],['pc','passé composé (il a volé)'],['pr','présent (il vole)']].forEach(x=>{h+='<button class="btn'+(T.tense===x[0]?' choisi':'')+'" data-a="temps" data-t="'+x[0]+'">'+x[1]+'</button>'});
+  h+='</div></div></section>';
+  vue.innerHTML=h;
+}
+function entete(){const e=ETAPES[T.step];return '<p class="sur">Étape '+(T.step+1)+' · '+e.nom+' · '+e.aide+'</p>'}
+function rendChoix(){
+  const id=T.slot,d=SL[id];
+  let h=entete()+'<div class="phrase">'+phraseHtml(T.step,id)+'</div>';
+  h+='<h2 class="q"><span class="tag k-'+d.k+'">'+(d.k==='comp'?d.lab:KIND[d.k])+'</span>'+esc(d.q())+'<button class="rond" data-a="dis" data-t="'+esc(d.q())+'" aria-label="Écouter la question">🔊</button></h2>';
+  if(d.k==='name')h+=rendDes(d);
+  else{
+    if(OPT.slot!==id)OPT={slot:id,items:melange(B[id]).slice(0,6)};
+    h+='<div class="cartes">';
+    OPT.items.forEach((it,i)=>{
+      const m=etiquette(id,it),em=it.e;
+      h+='<div class="carte k-'+d.k+(em?'':' sans')+'" role="button" tabindex="0" data-a="choix" data-i="'+i+'">'+(em?'<span class="em">'+em+'</span>':'')+'<span class="mot">'+esc(m)+'</span><button class="ecoute" data-a="dis" data-t="'+esc(m)+'" aria-label="Écouter">🔊</button></div>';
+    });
+    h+='</div><div class="outils"><button class="btn" data-a="autres">🎲 D\'autres idées</button><button class="btn" data-a="libre">✏️ Mon idée</button></div>';
+    if(libre){
+      h+='<div class="boite">';
+      if(d.k==='nom')h+='<button class="btn'+(CG==='m'?' choisi':'')+'" data-a="genre" data-g="m">un</button><button class="btn'+(CG==='f'?' choisi':'')+'" data-a="genre" data-g="f">une</button>';
+      h+='<input class="champ" id="mon-idee" autocomplete="off" autocapitalize="off" placeholder="J\'écris mon mot"><button class="btn fort" data-a="libreOk">OK</button></div>';
+    }
+  }
+  vue.innerHTML=h;
+}
+function nomDes(){return DES.syl.join('')}
+function rendDes(d){
+  let h='<div class="centre"><button class="btn'+(DES.n===2?' choisi':'')+'" data-a="nbdes" data-n="2">2 dés</button><button class="btn'+(DES.n===3?' choisi':'')+'" data-a="nbdes" data-n="3">3 dés</button></div><div class="des">';
+  for(let i=0;i<DES.n;i++)h+='<button class="de" data-a="unde" data-i="'+i+'" aria-label="Relancer ce dé">'+(DES.syl[i]||'?')+'</button>';
+  h+='</div><div class="nomde" id="nomde">'+(DES.syl.length?sylHtml({syl:DES.syl}):'')+'</div>';
+  h+='<div class="centre"><button class="btn fort" data-a="lance">🎲 Lancer les dés</button><button class="btn fort" data-a="nomOk" id="nom-ok"'+(DES.syl.length===DES.n?'':' disabled')+'>✔ Je garde ce nom</button><button class="rond" data-a="disNom" aria-label="Écouter le nom">🔊</button></div>';
+  h+='<div class="boite"><input class="champ" id="mon-nom" autocomplete="off" placeholder="Ou j\'écris le nom"><button class="btn" data-a="nomLibre">OK</button>'+(d.opt?'<button class="btn" data-a="nomSans">Pas de nom</button>':'')+'</div>';
+  return h;
+}
+function tirer(i){
+  for(let k=0;k<60;k++){
+    const s=DES.syl.slice();
+    if(i===undefined)for(let j=0;j<DES.n;j++)s[j]=SYL[Math.floor(Math.random()*SYL.length)];
+    else s[i]=SYL[Math.floor(Math.random()*SYL.length)];
+    s.length=DES.n;
+    if(s.some((x,j)=>j&&x===s[j-1])||INTERDIT.test(s.join('')))continue;
+    DES.syl=s;return;
+  }
+}
+function lance(i){
+  if(DES.roule)return;DES.roule=true;
+  const des=[...vue.querySelectorAll('.de')].filter((x,j)=>i===undefined||j===i);
+  des.forEach(x=>x.classList.add('roule'));
+  let n=0;const iv=setInterval(()=>{
+    des.forEach(x=>x.textContent=SYL[Math.floor(Math.random()*SYL.length)]);
+    if(++n>9){clearInterval(iv);DES.roule=false;if(i!==undefined&&DES.syl.length!==DES.n)i=undefined;tirer(i);rendChoix();dis(nomDes())}
+  },75);
+}
+function photoHtml(n){
+  const ph=T.photos[n];
+  let h='<div class="boite">';
+  if(ph)h+='<img class="vignette" src="'+ph+'" alt="Mon dessin"><button class="btn" data-a="photoNon">🗑 Enlever mon dessin</button>';
+  h+='<label class="btn">📷 '+(ph?'Reprendre la photo':'Photographier mon dessin')+'<input type="file" accept="image/*" capture="environment" id="photo-cam" hidden></label>';
+  h+='<label class="btn">🖼 Choisir une image<input type="file" accept="image/*" id="photo-lib" hidden></label></div>';
+  return h;
+}
+function rendBilan(){
+  const n=T.step;
+  let h=entete()+'<h2>Bravo ! Voici ta phrase.</h2><div class="phrase grand">'+phraseHtml(n,null)+'</div>';
+  h+='<div class="outils"><button class="btn" data-a="dis" data-t="'+esc(texte(n))+'">🔊 Écouter ma phrase</button></div>';
+  h+='<p style="margin:0">Tu peux dessiner cette étape sur une feuille, puis la prendre en photo. Touche un mot coloré pour le changer.</p>'+photoHtml(n);
+  h+='<div class="outils">'+(n<4?'<button class="btn fort" data-a="step" data-n="'+(n+1)+'">Étape suivante : '+ETAPES[n+1].court.toLowerCase()+' →</button>':'<button class="btn fort" data-a="film">🎬 Voir mon histoire</button>')+'</div>';
+  vue.innerHTML=h;
+}
+
+/* ---------- Film ---------- */
+function sceneHtml(i){
+  const S=T.S,e=(x,cl,st)=>'<span class="e '+cl+'" style="'+st+'">'+((x&&x.e)||'⭐')+'</span>';
+  if(i===0)return '<div class="scene s0"><div class="carton"><span class="pop">'+hero().e+'</span><strong>'+esc(titre())+'</strong></div></div>';
+  if(i===6)return '<div class="scene s0"><div class="carton"><span class="brille">✨</span><strong style="font-size:1em">Fin</strong></div></div>';
+  const n=i-1;
+  if(T.photos[n])return '<div class="scene s'+i+'"><img src="'+T.photos[n]+'" alt="Mon dessin de l\'étape '+i+'"></div>';
+  let h='<div class="scene s'+i+'">';
+  if(i===1)h+=e(S.lieu,'','left:6%;font-size:1.7em;bottom:14%')+e(S.heros,'bob','left:52%');
+  if(i===2)h+=e(S.heros,'','left:6%;font-size:.75em')+e(S.objet,'vole','left:34%;font-size:.7em')+e(S.mechant,'droite','right:6%;font-size:1.4em');
+  if(i===3)h+=e(S.lieu3,'','left:8%;bottom:34%')+e(S.lieu3,'','left:40%;bottom:38%;font-size:1.2em')+e(S.lieu3,'','left:74%;bottom:34%')+e(S.heros,'gauche','left:30%')+'<span class="e pop" style="right:14%;animation-delay:1.7s">'+(S.ami.e||'⭐')+'</span>';
+  if(i===4)h+=e(S.heros,'gauche','left:10%')+'<span class="e pop" style="left:27%;bottom:42%;font-size:.7em;animation-delay:.8s">'+(S.moyen.e||'⭐')+'</span>'+e(S.mechant,'fuit','right:10%;font-size:1.3em')+'<span class="e pop" style="left:46%;font-size:.75em;animation-delay:2.6s">'+(S.objet.e||'⭐')+'</span>';
+  if(i===5)h+=e(S.ccl5,'pop','left:44%;bottom:58%;font-size:.8em')+e(S.heros,'bob','left:30%')+'<span class="e bob" style="left:54%;animation-delay:.3s,1s">'+(S.ami.e||'⭐')+'</span><span class="e brille" style="left:10%;bottom:62%;font-size:.5em">✨</span><span class="e brille" style="right:10%;bottom:54%;font-size:.5em;animation-delay:.5s">✨</span>';
+  return h+'</div>';
+}
+const cadreTexte=i=>i===0?titre():i===6?'Fin.':texte(i-1);
+function rendFilm(){
+  let h='<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
+  h+='<article class="conte"><h2>'+esc(titre())+'</h2>';
+  ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
+  h+='</article><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
+  vue.innerHTML=h;
+  cadre(0,true);
+}
+function boutonJoue(){const b=document.getElementById('joue');if(b)b.textContent=F.playing?'⏹ Arrêter':'▶ Regarder mon histoire'}
+function cadre(i,muet){
+  F.i=i;const tok=++F.tok;
+  const sc=document.getElementById('scene'),lg=document.getElementById('legende');if(!sc)return;
+  sc.innerHTML=sceneHtml(i);
+  const txt=cadreTexte(i);
+  lg.innerHTML=txt.split(' ').map(w=>'<span'+(muet?' class="on"':'')+'>'+esc(w)+'</span>').join(' ');
+  boutonJoue();
+  if(muet)return;
+  const mots=[...lg.children];let k=0,a=false,b=false;
+  const suite=()=>{
+    if(!a||!b||tok!==F.tok||!F.playing)return;
+    if(i<6)setTimeout(()=>{if(tok===F.tok&&F.playing)cadre(i+1)},1200);
+    else{F.playing=false;boutonJoue()}
+  };
+  const tic=()=>{if(tok!==F.tok)return;if(k<mots.length){mots[k++].classList.add('on');setTimeout(tic,430)}else{a=true;suite()}};
+  dis(txt,()=>{b=true;suite()});tic();
+}
+
+/* ---------- Actions ---------- */
+function ouvre(n){
+  T.step=n;libre=false;
+  const vide=ETAPES[n].slots.find(id=>T.S[id]===undefined);
+  if(vide){T.view='build';T.slot=vide;prepareNom()}else T.view='recap';
+  rend();
+}
+function prepareNom(){if(SL[T.slot].k==='name'){const v=T.S[T.slot];DES={n:(v&&v.syl&&v.syl.length)||2,syl:(v&&v.syl)?v.syl.slice():[],roule:false}}}
+function pose(v){T.S[T.slot]=v;OPT={slot:null,items:[]};ouvre(T.step)}
+function photo(f){
+  if(!f)return;const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{
+    const m=1000,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    T.photos[T.step]=c.toDataURL('image/jpeg',.72);rend();
+  };im.src=r.result};
+  r.readAsDataURL(f);
+}
+const ACT={
+  home(){tais();confirme=false;T.view='home';rend()},
+  voix(){T.voice=!T.voice;if(!T.voice)tais();rendChemin();sauve()},
+  temps(el){T.tense=el.dataset.t;rend()},
+  reprendre(){if(toutFini()){T.view='film';rend()}else ouvre(ETAPES.findIndex((e,i)=>!complet(i)))},
+  neuf(){if(Object.keys(T.S).length){confirme=true;rend()}else ACT.neufOui()},
+  neufOui(){confirme=false;T.S={};T.photos={};ouvre(0)},
+  neufNon(){confirme=false;rend()},
+  step(el){tais();ouvre(+el.dataset.n)},
+  film(){T.view='film';rend()},
+  slot(el){T.view='build';T.slot=el.dataset.s;libre=false;prepareNom();rend()},
+  dis(el){dis(el.dataset.t)},
+  choix(el){pose(OPT.items[+el.dataset.i])},
+  autres(){OPT={slot:null,items:[]};rendChoix()},
+  libre(){libre=!libre;rendChoix();const c=document.getElementById('mon-idee');c&&c.focus()},
+  genre(el){CG=el.dataset.g;const v=document.getElementById('mon-idee').value;rendChoix();document.getElementById('mon-idee').value=v},
+  libreOk(){
+    const x=document.getElementById('mon-idee').value.trim();if(!x)return;
+    const k=SL[T.slot].k;libre=false;
+    pose(k==='nom'?{w:x,g:CG,e:'⭐'}:k==='adj'?{m:x,f:x}:k==='verbe'?{ps:x,pc:x,pr:x}:{t:x,e:'⭐'});
+  },
+  nbdes(el){DES.n=+el.dataset.n;DES.syl=[];rendChoix()},
+  lance(){lance()},
+  unde(el){lance(DES.syl.length===DES.n?+el.dataset.i:undefined)},
+  disNom(){if(DES.syl.length)dis(nomDes())},
+  nomOk(){if(DES.syl.length===DES.n)pose({t:maj(nomDes()),syl:DES.syl.slice()})},
+  nomLibre(){const x=document.getElementById('mon-nom').value.trim();if(x)pose({t:maj(x)})},
+  nomSans(){pose({t:''})},
+  photoNon(){delete T.photos[T.step];rend()},
+  joue(){if(F.playing){F.playing=false;F.tok++;tais();boutonJoue()}else{F.playing=true;cadre(F.i>=6?0:F.i)}},
+  avant(){cadre(Math.max(0,F.i-1))},
+  apres(){cadre(Math.min(6,F.i+1))}
+};
+document.getElementById('app').addEventListener('click',ev=>{
+  const el=ev.target.closest('[data-a]');if(!el||el.disabled)return;
+  const f=ACT[el.dataset.a];if(f)f(el);
+});
+document.getElementById('app').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'){
+    if(ev.target.id==='mon-idee')ACT.libreOk();
+    else if(ev.target.id==='mon-nom')ACT.nomLibre();
+    else if(ev.target.classList.contains('carte'))ev.target.click();
+  }
+});
+document.getElementById('app').addEventListener('change',ev=>{
+  if(ev.target.id==='photo-cam'||ev.target.id==='photo-lib')photo(ev.target.files[0]);
+});
+if(T.view!=='home'&&!Object.keys(T.S).length)T.view='home';
+if(T.view==='film'&&!toutFini())T.view='home';
+if(T.view==='build'&&T.slot)prepareNom();
+rend();
+})();
+</script>
+
+</body>
+</html>
