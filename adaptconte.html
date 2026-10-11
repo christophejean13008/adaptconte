@@ -102,7 +102,7 @@ h1,h2{font-family:var(--titre);margin:0;line-height:1.1;text-wrap:balance}
 /* Film */
 .scene{position:relative;overflow:hidden;border-radius:24px;aspect-ratio:16/9;width:100%;max-width:760px;margin-inline:auto;font-size:clamp(46px,11vw,104px);border:3px solid var(--encre);background:#bfe3ff}
 .scene .e{position:absolute;line-height:1;bottom:9%}
-.scene img.plein{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;animation:zoom 9s ease-out both}
+.scene img.plein{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
 .scene .carton{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:4px;padding:16px}
 .scene .carton span{font-size:1em;line-height:1.1}
 .scene .carton strong{font-family:var(--titre);font-size:.42em;line-height:1.1;color:var(--encre)}
@@ -238,7 +238,7 @@ const VIDE={nom:'nom',adj:'adjectif',verbe:'verbe',name:'Nom'};
 
 /* ---------- État ---------- */
 const CLE='adaptconte-v1';
-let T={niv:1,hub:null,pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
+let T={niv:1,hub:null,mode:'ia',pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
 try{const s=JSON.parse(localStorage.getItem(CLE)||'null');if(s&&s.S)T=Object.assign(T,s)}catch(e){}
 const sauve=()=>{try{localStorage.setItem(CLE,JSON.stringify(T))}catch(e){}};
 let NIV=1,OPT={slot:null,items:[]},DES={n:2,syl:[],roule:false},CG='m',F={i:0,playing:false,tok:0},confirme=false,libre=false;
@@ -813,7 +813,8 @@ function fig(id){
 const PICTO_OK=['heros','porte','lieu','mechant','porteM','objet','lieu3','ami','moyen','desir','adv','situation','renc','magie'];
 let IA={n:null,msg:''};
 const enLigne=()=>T.net&&navigator.onLine!==false;
-function imgEtape(n){return T.photos[n]||(T.net&&T.ia[n])||''}
+function imgEtape(n){return (T.mode!=='moi'&&T.net&&T.ia[n])||T.photos[n]||''}
+const aIA=()=>T.net&&Object.keys(T.ia).length>0;
 function motCle(it){return (it.w||it.t||'').replace(/^((dans|sur|au bord du|au|à|de|du|des|le|la|les|un|une|son|sa|ses) |l')+/i,'').trim()}
 function enData(blob){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=ko;r.readAsDataURL(blob)})}
 async function chercheP(id){
@@ -855,7 +856,7 @@ function iaHtml(n){
   if(T.ia[n])h+='<img class="vignette" src="'+T.ia[n]+'" alt="Illustration"><button class="btn" data-a="iaNon">🗑 Enlever</button>';
   h+='<button class="btn" data-a="ia"'+(IA.n!==null?' disabled':'')+'>✨ '+(T.ia[n]?'Refaire':'Créer')+' une illustration</button>';
   if(IA.msg)h+='<span>'+esc(IA.msg)+'</span>';
-  if(T.photos[n]&&T.ia[n])h+='<span>Dans le film, c\'est ton dessin qui est montré.</span>';
+  if(T.ia[n])h+='<span>Dans le film, tu choisis : les images de l\'ordinateur ou tes dessins.</span>';
   return h+'</div>';
 }
 function creditHtml(){return T.net&&Object.keys(T.pictos).some(k=>T.pictos[k].src)?'<p style="margin:0;font-size:14px;color:var(--doux)">Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p>':''}
@@ -931,7 +932,7 @@ function sceneHtml(i){
 }
 const cadreTexte=i=>i===0?titre():i===6?'Fin.':texte(i-1);
 function rendFilm(){
-  let h='<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
+  let h=(aIA()?'<div class="centre"><button class="btn'+(T.mode!=='moi'?' choisi':'')+'" data-a="mode" data-m="ia">📖 Avec les images de l\'ordinateur</button><button class="btn'+(T.mode==='moi'?' choisi':'')+'" data-a="mode" data-m="moi">🎨 Avec mes dessins</button></div>':'')+'<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
   h+='<article class="conte"><h2>'+esc(titre())+'</h2>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
   h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="imprime">🖨 Imprimer mon histoire</button><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
@@ -1008,6 +1009,7 @@ const ACT={
   photoNon(){delete T.photos[T.step];rend()},
   passe(){pose({skip:true})},
   net(){T.net=!T.net;rend()},
+  mode(el){tais();T.mode=el.dataset.m;rend()},
   async testNet(){
     const z=document.getElementById('diag');if(!z)return;
     const ligne=(ok,m)=>{const p=document.createElement('p');p.style.margin='0';p.textContent=(ok?'✅ ':'❌ ')+m;z.appendChild(p)};
@@ -1040,11 +1042,11 @@ const ACT={
     const etat=m=>{IA.msg=m;const el=document.getElementById('ia-etat');if(el)el.textContent=m};
     let ko=false;
     for(let n=0;n<5&&!ko;n++){
-      if(imgEtape(n))continue;
+      if(T.ia[n])continue;
       IA.n=n;etat('Illustration de l\'étape '+(n+1)+' sur 5…');
       try{await illustre(n)}catch(e){ko=true}
     }
-    IA={n:null,msg:ko?IA_KO:''};
+    IA={n:null,msg:ko?IA_KO:''};T.mode='ia';
     if(T.view==='film')rend();
   },
   sous(el){T.hub=T.slot;T.slot=el.dataset.s;OPT={slot:null,items:[]};rend()},
