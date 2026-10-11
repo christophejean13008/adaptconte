@@ -1314,7 +1314,7 @@ async function encodeVideo(R,x,cv,V,A){
   const venc=new VideoEncoder({output:(c,m)=>mux.addVideoChunk(c,m),error:e=>{erreur=e}});
   venc.configure(V.cfg);
   R.fermer=()=>{try{venc.state!=='closed'&&venc.close()}catch(e){}};
-  const N=Math.ceil(total/1000*FPS);let k=0,cle='';
+  const N=Math.ceil(total/1000*FPS);let k=0,cle='',nSon=0;
   for(let f=0;f<N;f++){
     const t=f*1000/FPS;
     while(k<R.pages.length-1&&t>=debuts[k+1])k++;
@@ -1334,7 +1334,21 @@ async function encodeVideo(R,x,cv,V,A){
   if(erreur)throw erreur;
   await venc.flush();
   if(pcm){
-    const aenc=new AudioEncoder({output:(c,m)=>mux.addAudioChunk(c,m),error:e=>{erreur=e}});
+    // Le son AAC est rangé « à la main » dans le fichier : certains appareils le livrent avec un en-tête ADTS
+    // ou sans sa fiche de description, et le lecteur resterait alors muet.
+    const idx=[96000,88200,64000,48000,44100,32000,24000,22050,16000,12000,11025,8000].indexOf(sr);
+    const fiche=idx<0?null:new Uint8Array([(2<<3)|(idx>>1),((idx&1)<<7)|(2<<3)]);
+    const aenc=new AudioEncoder({error:e=>{erreur=e},output:(c,m)=>{
+      try{
+        if(A.mux!=='aac'){mux.addAudioChunk(c,m);nSon++;return}
+        let d=new Uint8Array(c.byteLength);c.copyTo(d);
+        if(d.length>9&&d[0]===0xFF&&(d[1]&0xF6)===0xF0){d=d.subarray((d[1]&1)?7:9);R.adts=true}
+        const desc=m&&m.decoderConfig&&m.decoderConfig.description;
+        if(!desc)R.sansFiche=true;
+        const meta=desc&&!R.adts?m:(nSon===0&&fiche?{decoderConfig:{codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:2,description:fiche}}:undefined);
+        mux.addAudioChunkRaw(d,c.type,c.timestamp,c.duration||Math.round(1024/sr*1e6),meta);nSon++;
+      }catch(e){erreur=erreur||e}
+    }});
     aenc.configure(A.cfg);
     const fin=Math.min(pcm.length,Math.ceil(total/1000*sr)),PAS=4096;
     for(let o=0,j=0;o<fin;o+=PAS,j++){
@@ -1347,10 +1361,13 @@ async function encodeVideo(R,x,cv,V,A){
     if(REC!==R){try{aenc.close()}catch(e){}R.fermer();return}
     if(erreur)throw erreur;
     await aenc.flush();aenc.close();
+    if(erreur)throw erreur;
   }
   venc.close();mux.finalize();
   R.blob=new Blob([mux.target.buffer],{type:'video/mp4'});R.url=URL.createObjectURL(R.blob);
   R.sonOpus=!!(pcm&&A.mux==='opus');R.etat='fini';
+  R.diag='Image '+V.cfg.codec+' · son '+(pcm?A.cfg.codec+' à '+sr+' Hz, '+nSon+' blocs'+(R.adts?', ADTS retiré':'')+(R.sansFiche?', fiche ajoutée':''):'aucun');
+  if(pcm&&!nSon)R.note=(R.note?R.note+' ':'')+'Le son n\'a pas pu être encodé sur cet appareil.';
   try{fermeAC(R.ac)}catch(e){}
   if(REC===R&&T.view==='video')rendVideo();
 }
@@ -1390,7 +1407,7 @@ function rendVideo(){
   else if(REC.etat==='fini'){
     const mp4=/mp4/.test(REC.blob.type);
     h+='<video class="video" controls playsinline src="'+REC.url+'"></video><div class="outils"><button class="btn fort" data-a="videoGarde">💾 Enregistrer la vidéo</button><button class="btn" data-a="videoRefaire">🔁 Recommencer</button><button class="btn" data-a="film">← Retour au film</button></div>';
-    h+='<p style="margin:0;font-size:15px;color:var(--doux)">'+(mp4?'Format MP4 : cette vidéo se lit sur iPad, Android et ordinateur.'+(REC.sonOpus?' Le son est au format Opus : il peut rester muet sur un ancien iPad.':'')+(REC.note?' '+esc(REC.note):''):'Format WebM : cette vidéo se lit sur Android et ordinateur, mais peut ne pas se lire sur iPad. Pour un fichier MP4 lisible partout, crée la vidéo depuis Safari sur iPad ou depuis un Chrome récent.')+'</p>';
+    h+='<p style="margin:0;font-size:15px;color:var(--doux)">'+(mp4?'Format MP4 : cette vidéo se lit sur iPad, Android et ordinateur.'+(REC.sonOpus?' Le son est au format Opus : il peut rester muet sur un ancien iPad.':'')+(REC.note?' '+esc(REC.note):'')+(REC.diag?' <span style="font-size:12px">['+esc(REC.diag)+']</span>':''):'Format WebM : cette vidéo se lit sur Android et ordinateur, mais peut ne pas se lire sur iPad. Pour un fichier MP4 lisible partout, crée la vidéo depuis Safari sur iPad ou depuis un Chrome récent.')+'</p>';
   }else h+='<div class="outils" id="video-barre" style="align-items:center;min-height:54px"></div><canvas id="toile-video" width="'+VW+'" height="'+VH+'"></canvas><p style="margin:0;font-size:15px;color:var(--doux)">Pendant l\'enregistrement, laisse cette page affichée sans toucher l\'écran.</p>';
   vue.innerHTML=h;majBarre();
 }
@@ -1491,6 +1508,10 @@ const ACT={
       const j=await r.json().catch(()=>({}));
       res.push(j.audio?[true,'Voix de l\'ordinateur pour la vidéo : ça marche.']:[false,'Voix de l\'ordinateur pour la vidéo : pas encore disponible. Il faut coller le nouveau code dans Cloudflare. Détail : '+(j.erreur||r.status)]);
     }catch(e){res.push([false,'Voix de l\'ordinateur pour la vidéo : service injoignable depuis cette page.'])}
+    try{
+      const V=await codecVideo(),sr=(()=>{try{const a=new (window.AudioContext||window.webkitAudioContext)(),r=a.sampleRate;a.close();return r}catch(e){return 48000}})(),A=await codecAudio(sr);
+      res.push([!!(V&&A&&A.mux==='aac'),'Vidéo sur cet appareil : image '+(V?V.cfg.codec:'en direct (ancienne méthode)')+' · son '+(A?A.cfg.codec+' à '+sr+' Hz':'non encodable')+'.']);
+    }catch(e){}
     z.textContent='';res.forEach(x=>ligne(x[0],x[1]));
   },
   pictoNon(){T.pictos[DR.id].src='';DR=null;T.view='recap';rend()},
