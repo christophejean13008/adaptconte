@@ -97,7 +97,13 @@ h1,h2{font-family:var(--titre);margin:0;line-height:1.1;text-wrap:balance}
 .plan b{font-family:var(--titre);font-size:20px;display:block}
 .plan i{font-style:normal;color:var(--name);font-weight:700;display:block}
 .plan small{color:var(--doux);font-size:14px}
-.adulte{border-top:2px solid var(--trait);padding-top:12px;display:grid;gap:8px}
+.adulte{margin-top:28px;background:var(--papier);border:2px dashed var(--trait);border-radius:16px;padding:12px 14px;display:grid;gap:8px;font-size:14px;color:var(--doux)}
+.adulte h2{font-family:var(--corps);font-size:15px;color:var(--encre);letter-spacing:.04em;text-transform:uppercase}
+.adulte .sur{font-size:12px;margin-top:4px}
+.adulte .btn{font-size:14px;min-height:36px;padding:5px 12px;border-width:1.5px;border-radius:10px;font-weight:400}
+.adulte .btn.choisi{font-weight:700}
+.adulte .champ{font-size:14px;padding:6px 10px;border-width:1.5px;border-radius:10px}
+.adulte p{max-width:none}
 
 /* Film */
 .scene{position:relative;overflow:hidden;border-radius:24px;aspect-ratio:16/9;width:100%;max-width:760px;margin-inline:auto;font-size:clamp(46px,11vw,104px);border:3px solid var(--encre);background:#bfe3ff}
@@ -714,7 +720,7 @@ function rendAccueil(){
   if(encours)h+='<button class="btn fort" data-a="reprendre">▶ Continuer mon histoire</button>';
   if(!confirme)h+='<button class="btn'+(encours?'':' fort')+'" data-a="neuf" data-n="1">✨ Nouvelle histoire · niveau 1</button><button class="btn" data-a="neuf" data-n="2">✨ Nouvelle histoire · niveau 2 (plus de détails)</button><button class="btn" data-a="neuf" data-n="3">✨ Nouvelle histoire · niveau 3 (portraits et lieux)</button>';
   else h+='<span class="boite">Effacer l\'histoire en cours ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
-  h+='</div><div class="adulte"><p class="sur">Réglage pour l\'adulte : temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
+  h+='</div><div class="adulte"><h2>⚙️ Réglages pour l\'adulte</h2><p class="sur">Temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
   [['ps','passé simple (il vola)'],['pc','passé composé (il a volé)'],['pr','présent (il vole)']].forEach(x=>{h+='<button class="btn'+(T.tense===x[0]?' choisi':'')+'" data-a="temps" data-t="'+x[0]+'">'+x[1]+'</button>'});
   h+='</div><p class="sur">Illustrations en ligne : pictogrammes ARASAAC et images créées par IA</p><div class="outils"><button class="btn'+(T.net?' choisi':'')+'" data-a="net">'+(T.net?'Activées':'Désactivées')+'</button><input class="champ" id="url-ia" value="'+esc(T.urlIA)+'" aria-label="Adresse du service d\'images" autocomplete="off" autocapitalize="off"><button class="btn" data-a="testNet">Tester les illustrations</button></div><div id="diag" style="font-size:15px;display:grid;gap:4px"></div><p style="margin:0;font-size:14px;color:var(--doux)">Sans connexion, l\'appli garde les dessins et les emojis. Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p></div></section>';
   vue.innerHTML=h;
