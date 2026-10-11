@@ -1138,6 +1138,7 @@ function abandonneVideo(){
   const R=REC;REC=null;if(!R)return;
   R.annule=true;
   try{if(R.rec&&R.rec.state!=='inactive')R.rec.stop()}catch(e){}
+  clearInterval(R.garde);try{R.veille&&R.veille.release()}catch(e){}
   try{R.stream&&R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop());R.ac&&R.ac.close()}catch(e){}
   if(R.url)URL.revokeObjectURL(R.url);
 }
@@ -1201,24 +1202,33 @@ async function demarreVideo(voix,ac,synth){
   }catch(e){REC={etat:'err',err:'La vidéo n\'a pas pu démarrer sur cet appareil.'};return rendVideo()}
   R.rec.ondataavailable=e=>{if(e.data&&e.data.size)R.chunks.push(e.data)};
   R.rec.onstop=()=>{
+    clearInterval(R.garde);try{R.veille&&R.veille.release()}catch(e){}
     try{R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop());R.ac&&R.ac.close()}catch(e){}
     if(R.annule)return;
     R.blob=new Blob(R.chunks,{type:type.split(';')[0]});R.url=URL.createObjectURL(R.blob);R.etat='fini';
     if(REC===R&&T.view==='video')rendVideo();
   };
   R.rec.start();R.etat='rec';R.t0=performance.now();jouePage(R);majBarre();
-  const boucle=()=>{
-    if(REC!==R||R.etat!=='rec')return;
-    const pg=R.pages[R.i],dt=performance.now()-R.t0,n=pg.txt.split(' ').length;
-    if(R.ac){
-      dessinePage(x,R.imgs,pg,Math.ceil(n*Math.min(1,dt/R.duree)));
-      if(dt>R.duree+900)pageSuivante();
-    }else{
-      dessinePage(x,R.imgs,pg,R.voix?1e9:Math.floor(dt/400));
-      if(!R.voix&&dt>Math.max(2600,n*400+1600))pageSuivante();
-    }
-    requestAnimationFrame(boucle);
+  // Une image est redessinée et poussée dans la vidéo à chaque passage, même si la page ne change pas :
+  // sans cela, certains navigateurs (Safari sur iPad) arrêtent d'enregistrer l'image pendant que le son continue.
+  const piste=R.stream.getVideoTracks()[0];
+  let dernier=0,bascule=0;
+  const image=()=>{
+    if(REC!==R||R.etat!=='rec')return false;
+    dernier=performance.now();
+    const pg=R.pages[R.i],dt=dernier-R.t0,n=pg.txt.split(' ').length;
+    try{dessinePage(x,R.imgs,pg,R.ac?Math.ceil(n*Math.min(1,dt/R.duree)):R.voix?1e9:Math.floor(dt/400))}
+    catch(e){x.fillStyle='#ffffff';x.fillRect(0,0,VW,VH);x.fillStyle='#1b2452';x.font='40px sans-serif';x.textAlign='center';x.textBaseline='middle';lignes(x,pg.txt.split(' '),VW-160).forEach((l,k)=>x.fillText(l.join(' '),VW/2,200+k*56))}
+    bascule^=1;x.fillStyle=bascule?'#e6f1ff':'#e4effd';x.fillRect(0,0,3,3);
+    try{if(piste&&piste.requestFrame)piste.requestFrame()}catch(e){}
+    if(R.ac){if(dt>R.duree+900)pageSuivante()}
+    else if(!R.voix&&dt>Math.max(2600,n*400+1600))pageSuivante();
+    return true;
   };
+  const boucle=()=>{if(image())requestAnimationFrame(boucle)};
+  R.garde=setInterval(()=>{if(REC!==R||R.etat!=='rec')return clearInterval(R.garde);if(performance.now()-dernier>120)image()},60);
+  try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(v=>{R.veille=v},()=>{})}catch(e){}
+  try{cv.scrollIntoView({block:'center'})}catch(e){}
   boucle();
 }
 function rendVideo(){
@@ -1229,7 +1239,7 @@ function rendVideo(){
     const mp4=/mp4/.test(REC.blob.type);
     h+='<video class="video" controls playsinline src="'+REC.url+'"></video><div class="outils"><button class="btn fort" data-a="videoGarde">💾 Enregistrer la vidéo</button><button class="btn" data-a="videoRefaire">🔁 Recommencer</button><button class="btn" data-a="film">← Retour au film</button></div>';
     h+='<p style="margin:0;font-size:15px;color:var(--doux)">'+(mp4?'Format MP4 : cette vidéo se lit sur iPad, Android et ordinateur.':'Format WebM : cette vidéo se lit sur Android et ordinateur, mais peut ne pas se lire sur iPad. Pour un fichier MP4 lisible partout, crée la vidéo depuis Safari sur iPad ou depuis un Chrome récent.')+'</p>';
-  }else h+='<canvas id="toile-video" width="'+VW+'" height="'+VH+'"></canvas><div class="outils" id="video-barre" style="align-items:center"></div>';
+  }else h+='<div class="outils" id="video-barre" style="align-items:center;min-height:54px"></div><canvas id="toile-video" width="'+VW+'" height="'+VH+'"></canvas><p style="margin:0;font-size:15px;color:var(--doux)">Pendant l\'enregistrement, laisse cette page affichée sans toucher l\'écran.</p>';
   vue.innerHTML=h;majBarre();
 }
 
