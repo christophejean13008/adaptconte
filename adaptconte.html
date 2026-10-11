@@ -272,7 +272,7 @@ const VIDE={nom:'nom',adj:'adjectif',verbe:'verbe',name:'Nom'};
 
 /* ---------- État ---------- */
 const CLE='adaptconte-v1';
-let T={niv:1,hub:null,auteur:'',dernierAuteur:'',imp:{q:'ia',c:true},mode:'ia',pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
+let T={niv:1,hub:null,fiche:'',ficheN:0,auteur:'',dernierAuteur:'',imp:{q:'ia',c:true},mode:'ia',pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
 try{const s=JSON.parse(localStorage.getItem(CLE)||'null');if(s&&s.S)T=Object.assign(T,s)}catch(e){}
 const sauve=()=>{try{localStorage.setItem(CLE,JSON.stringify(T))}catch(e){}};
 let NIV=1,OPT={slot:null,items:[]},DES={n:2,syl:[],roule:false},CG='m',F={i:0,playing:false,tok:0},confirme=false,libre=false;
@@ -879,12 +879,38 @@ async function chercheP(id){
     if(T.view==='recap')rend();
   }catch(e){delete T.pictos[id]}
 }
+/* Mêmes personnages d'une image à l'autre : une fiche écrite fixe leur apparence une fois pour toutes,
+   et les images déjà faites sont renvoyées comme modèles pour les suivantes. */
+async function ficheIA(n){
+  if(T.fiche&&T.ficheN>n)return;
+  try{
+    const histoire=[0,1,2,3,4].filter(i=>i<=n||complet(i)).map(texte).join(' ').slice(0,2500);
+    const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fichePerso:true,histoire,fiche:T.fiche||''})});
+    const j=await r.json();
+    if(j.fiche){T.fiche=String(j.fiche).replace(/[<>"]/g,'');T.ficheN=[0,1,2,3,4].filter(i=>i<=n||complet(i)).length}
+  }catch(e){}
+}
+async function refsIA(n){
+  let ids=[0,1,2,3,4].filter(i=>i<n&&T.ia[i]);
+  if(ids.length>4)ids=[ids[0]].concat(ids.slice(-3));
+  const out=[];
+  for(const i of ids){
+    const im=await chargeImg(T.ia[i]);if(!im)continue;
+    const k=Math.min(1,448/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    out.push(c.toDataURL('image/jpeg',.8).split(',')[1]);
+  }
+  return out;
+}
 async function illustre(n){
-  const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:texte(n).slice(0,1400),personnages:(texte(0)+(n>0?' '+texte(1):'')).slice(0,900),seed:Math.floor(Math.random()*1e6)})});
+  await ficheIA(n);
+  const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:texte(n).slice(0,1400),personnages:(texte(0)+(n>0?' '+texte(1):'')).slice(0,900),fiche:T.fiche||'',refs:await refsIA(n)})});
   const j=await r.json();
   if(!j.image)throw new Error(j.erreur||'vide');
+  T.iaModele=(j.modele||'')+(j.note?' ('+String(j.note).slice(0,120)+')':'');
+  const type=/^iVBOR/.test(j.image)?'png':/^UklG/.test(j.image)?'webp':'jpeg';
   const im=new Image();
-  await new Promise((ok,ko)=>{im.onload=ok;im.onerror=ko;im.src='data:image/jpeg;base64,'+j.image});
+  await new Promise((ok,ko)=>{im.onload=ok;im.onerror=ko;im.src='data:image/'+type+';base64,'+j.image});
   const k=Math.min(1,768/Math.max(im.width,im.height)),c=document.createElement('canvas');
   c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
   T.ia[n]=c.toDataURL('image/jpeg',.8);sauve();
@@ -1011,7 +1037,7 @@ function rendFilm(){
   let h=(aIA()?'<div class="centre"><button class="btn'+(T.mode!=='moi'?' choisi':'')+'" data-a="mode" data-m="ia">📖 Avec les images de l\'ordinateur</button><button class="btn'+(T.mode==='moi'?' choisi':'')+'" data-a="mode" data-m="moi">🎨 Avec mes dessins</button></div>':'')+'<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
   h+='<article class="conte"><h2>'+esc(titre())+'</h2><p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(T.auteur?'Une histoire inventée par '+esc(T.auteur):'')+'<button class="btn" data-a="auteur">✏️ '+(T.auteur?'Changer le prénom':'Écrire mon prénom')+'</button></p>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
-  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
+  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button>'+(aIA()?'<button class="btn" data-a="iaRefaire"'+(IA.n!==null?' disabled':'')+'>🔁 Refaire toutes les images</button>':'')+'<span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
   vue.innerHTML=h;
   prepareImpression();
   archive().catch(()=>{});
@@ -1041,7 +1067,7 @@ function cadre(i,muet){
 let BIB={msg:'',suppr:null};
 function bd(){return new Promise((ok,ko)=>{try{const r=indexedDB.open('adaptconte',1);r.onupgradeneeded=()=>r.result.createObjectStore('histoires',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
 async function bdOp(mode,fn){const d=await bd();return new Promise((ok,ko)=>{const tx=d.transaction('histoires',mode),rq=fn(tx.objectStore('histoires'));tx.oncomplete=()=>ok(rq&&rq.result);tx.onerror=()=>ko(tx.error);tx.onabort=()=>ko(tx.error)})}
-const copie=()=>JSON.parse(JSON.stringify({auteur:T.auteur,niv:T.niv,S:T.S,photos:T.photos,dessins:T.dessins,pictos:T.pictos,ia:T.ia,mode:T.mode,tense:T.tense}));
+const copie=()=>JSON.parse(JSON.stringify({auteur:T.auteur,fiche:T.fiche,ficheN:T.ficheN,niv:T.niv,S:T.S,photos:T.photos,dessins:T.dessins,pictos:T.pictos,ia:T.ia,mode:T.mode,tense:T.tense}));
 const nomFichier=()=>(titre()+(T.auteur?' par '+T.auteur:'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^0-9a-zA-Z]+/g,'-').replace(/^-|-$/g,'')||'mon-histoire';
 async function archive(){
   if(!(T.S.herosNom&&T.S.herosNom.t))return false;
@@ -1050,7 +1076,7 @@ async function archive(){
   sauve();return true;
 }
 function charge(r){
-  Object.assign(T,{hub:null,auteur:'',photos:{},dessins:{},pictos:{},ia:{},mode:'ia'},r.data,{id:r.id});
+  Object.assign(T,{hub:null,auteur:'',fiche:'',ficheN:0,photos:{},dessins:{},pictos:{},ia:{},mode:'ia'},r.data,{id:r.id});
   OPT={slot:null,items:[]};BIB.msg='';
   if(toutFini()){T.view='film';rend()}else ouvre(Math.max(0,[0,1,2,3,4].findIndex(i=>!complet(i))));
 }
@@ -1447,7 +1473,7 @@ const ACT={
   temps(el){T.tense=el.dataset.t;rend()},
   reprendre(){if(toutFini()){T.view='film';rend()}else ouvre(ETAPES.findIndex((e,i)=>!complet(i)))},
   neuf(el){NIV=+el.dataset.n||1;if(!Object.keys(T.S).length)return ACT.neufOui();archive().then(ok=>{if(ok||!(T.S.herosNom&&T.S.herosNom.t))ACT.neufOui();else{confirme=true;rend()}},()=>{confirme=true;rend()})},
-  neufOui(){confirme=false;T.id=Date.now();T.mode='ia';T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};T.auteur='';OPT={slot:null,items:[]};T.view='auteur';rend()},
+  neufOui(){confirme=false;T.id=Date.now();T.mode='ia';T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};T.fiche='';T.ficheN=0;T.auteur='';OPT={slot:null,items:[]};T.view='auteur';rend()},
   neufNon(){confirme=false;rend()},
   step(el){tais();ouvre(+el.dataset.n)},
   film(){T.view='film';rend()},
@@ -1507,7 +1533,7 @@ const ACT={
     try{
       const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:'Un chat dort au soleil.',personnages:'',seed:1})});
       const j=await r.json().catch(()=>({}));
-      if(r.ok&&j.image)res.push([true,'Images par IA : ça marche.']);
+      if(r.ok&&j.image)res.push(j.modele==='flux-2-klein-4b'?[true,'Images par IA : ça marche, avec le modèle qui garde les mêmes personnages.']:j.modele?[false,'Images par IA : ça marche, mais avec l\'ancien modèle : les personnages changeront d\'une image à l\'autre. Détail : '+(j.note||'aucun')]:[false,'Images par IA : ça marche, mais le service est l\'ancienne version. Il faut coller le nouveau code dans Cloudflare pour garder les mêmes personnages.']);
       else if(r.status===403)res.push([false,'Images par IA : le service refuse cette adresse ('+location.origin+'). Il faut l\'ajouter à la liste ORIGINES du code Cloudflare.']);
       else if(/run|binding|AI/.test(j.erreur||''))res.push([false,'Images par IA : le service existe, mais la liaison Workers AI nommée AI manque (étape 3 de l\'installation). Détail : '+j.erreur]);
       else res.push([false,'Images par IA : le service répond une erreur '+r.status+'. Détail : '+(j.erreur||'aucun')]);
@@ -1533,6 +1559,7 @@ const ACT={
     try{await illustre(n);IA={n:null,msg:''}}catch(e){IA={n:null,msg:IA_KO}}
     if(T.view==='recap')rend();
   },
+  iaRefaire(){if(IA.n!==null)return;T.ia={};T.fiche='';T.ficheN=0;ACT.iaTout()},
   async iaTout(){
     if(IA.n!==null)return;
     const etat=m=>{IA.msg=m;const el=document.getElementById('ia-etat');if(el)el.textContent=m};
