@@ -157,6 +157,11 @@ h1,h2{font-family:var(--titre);margin:0;line-height:1.1;text-wrap:balance}
 .phrase.dense{font-size:clamp(17px,2vw,21px);line-height:1.85;max-height:9.6em;overflow-y:auto}
 .phrase.dense.grand{max-height:none;font-size:clamp(19px,2.3vw,24px)}
 .legende.long{font-size:19px}
+.biblio{display:grid;gap:8px}
+.hist{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hist .ouvre{flex:1 1 240px;min-width:0;justify-content:flex-start;text-align:left}
+.hist small{font-weight:400;color:var(--doux)}
+#toile-video,.video{display:block;width:100%;max-width:860px;height:auto;margin-inline:auto;border:3px solid var(--encre);border-radius:16px;background:#fff}
 .dess{object-fit:contain;display:block}
 .scene .dess{width:1.25em;height:1.25em}
 .btn .dess{width:36px;height:36px}
@@ -703,12 +708,14 @@ function rendChemin(){
 }
 function rend(){
   F.tok++;F.playing=false;
+  if(T.view!=='video'&&REC)abandonneVideo();
   if(T.view==='draw'&&!DR)T.view='recap';
   rendChemin();
   if(T.view==='home')rendAccueil();
   else if(T.view==='build')rendChoix();
   else if(T.view==='recap')rendBilan();
   else if(T.view==='draw')rendDessin();
+  else if(T.view==='video')rendVideo();
   else rendFilm();
   sauve();
 }
@@ -719,11 +726,12 @@ function rendAccueil(){
   h+='</ol><div class="outils">';
   if(encours)h+='<button class="btn fort" data-a="reprendre">▶ Continuer mon histoire</button>';
   if(!confirme)h+='<button class="btn'+(encours?'':' fort')+'" data-a="neuf" data-n="1">✨ Nouvelle histoire · niveau 1</button><button class="btn" data-a="neuf" data-n="2">✨ Nouvelle histoire · niveau 2 (plus de détails)</button><button class="btn" data-a="neuf" data-n="3">✨ Nouvelle histoire · niveau 3 (portraits et lieux)</button>';
-  else h+='<span class="boite">Effacer l\'histoire en cours ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
-  h+='</div><div class="adulte"><h2>⚙️ Réglages pour l\'adulte</h2><p class="sur">Temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
+  else h+='<span class="boite">L\'histoire en cours n\'a pas pu être sauvegardée ici. L\'effacer ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
+  h+='</div><h2 style="font-size:24px;margin-top:10px">📚 Mes histoires</h2><div id="biblio" class="biblio"></div><div class="outils"><label class="btn">📥 Ouvrir un fichier d\'histoire<input type="file" accept=".json,application/json" id="import-h" hidden></label><span id="bib-msg" style="align-self:center">'+esc(BIB.msg)+'</span></div><div class="adulte"><h2>⚙️ Réglages pour l\'adulte</h2><p class="sur">Temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
   [['ps','passé simple (il vola)'],['pc','passé composé (il a volé)'],['pr','présent (il vole)']].forEach(x=>{h+='<button class="btn'+(T.tense===x[0]?' choisi':'')+'" data-a="temps" data-t="'+x[0]+'">'+x[1]+'</button>'});
   h+='</div><p class="sur">Illustrations en ligne : pictogrammes ARASAAC et images créées par IA</p><div class="outils"><button class="btn'+(T.net?' choisi':'')+'" data-a="net">'+(T.net?'Activées':'Désactivées')+'</button><input class="champ" id="url-ia" value="'+esc(T.urlIA)+'" aria-label="Adresse du service d\'images" autocomplete="off" autocapitalize="off"><button class="btn" data-a="testNet">Tester les illustrations</button></div><div id="diag" style="font-size:15px;display:grid;gap:4px"></div><p style="margin:0;font-size:14px;color:var(--doux)">Sans connexion, l\'appli garde les dessins et les emojis. Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p></div></section>';
   vue.innerHTML=h;
+  rendBiblio();
 }
 function entete(){const e=ETAPES[T.step];return '<p class="sur">Étape '+(T.step+1)+' · '+e.nom+' · '+e.aide+'</p>'}
 function rendChoix(){
@@ -941,9 +949,10 @@ function rendFilm(){
   let h=(aIA()?'<div class="centre"><button class="btn'+(T.mode!=='moi'?' choisi':'')+'" data-a="mode" data-m="ia">📖 Avec les images de l\'ordinateur</button><button class="btn'+(T.mode==='moi'?' choisi':'')+'" data-a="mode" data-m="moi">🎨 Avec mes dessins</button></div>':'')+'<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
   h+='<article class="conte"><h2>'+esc(titre())+'</h2>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
-  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="imprime">🖨 Imprimer mon histoire</button><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
+  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><button class="btn" data-a="exporte">📤 Fichier à partager</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
   vue.innerHTML=h;
   prepareImpression();
+  archive().catch(()=>{});
   cadre(0,true);
 }
 function boutonJoue(){const b=document.getElementById('joue');if(b)b.textContent=F.playing?'⏹ Arrêter':'▶ Regarder mon histoire'}
@@ -964,6 +973,180 @@ function cadre(i,muet){
   };
   const tic=()=>{if(tok!==F.tok)return;if(k<mots.length){mots[k++].classList.add('on');setTimeout(tic,430)}else{a=true;suite()}};
   dis(txt,()=>{b=true;suite()});tic();
+}
+
+/* ---------- Mes histoires : sauvegarde sur l'appareil, fichier à partager ---------- */
+let BIB={msg:'',suppr:null};
+function bd(){return new Promise((ok,ko)=>{try{const r=indexedDB.open('adaptconte',1);r.onupgradeneeded=()=>r.result.createObjectStore('histoires',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
+async function bdOp(mode,fn){const d=await bd();return new Promise((ok,ko)=>{const tx=d.transaction('histoires',mode),rq=fn(tx.objectStore('histoires'));tx.oncomplete=()=>ok(rq&&rq.result);tx.onerror=()=>ko(tx.error);tx.onabort=()=>ko(tx.error)})}
+const copie=()=>JSON.parse(JSON.stringify({niv:T.niv,S:T.S,photos:T.photos,dessins:T.dessins,pictos:T.pictos,ia:T.ia,mode:T.mode,tense:T.tense}));
+const nomFichier=()=>titre().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^0-9a-zA-Z]+/g,'-').replace(/^-|-$/g,'')||'mon-histoire';
+async function archive(){
+  if(!(T.S.herosNom&&T.S.herosNom.t))return false;
+  if(!T.id)T.id=Date.now();
+  await bdOp('readwrite',st=>st.put({id:T.id,titre:titre(),date:Date.now(),niv:T.niv,fini:toutFini(),data:copie()}));
+  sauve();return true;
+}
+function charge(r){
+  Object.assign(T,{hub:null,photos:{},dessins:{},pictos:{},ia:{},mode:'ia'},r.data,{id:r.id});
+  OPT={slot:null,items:[]};BIB.msg='';
+  if(toutFini()){T.view='film';rend()}else ouvre(Math.max(0,[0,1,2,3,4].findIndex(i=>!complet(i))));
+}
+async function rendBiblio(){
+  let l;
+  try{l=await bdOp('readonly',st=>st.getAll())}catch(e){l=null}
+  const z=document.getElementById('biblio');if(!z)return;
+  if(!l){z.innerHTML='<p style="margin:0">La sauvegarde des histoires n\'est pas disponible ici.</p>';return}
+  if(!l.length){z.innerHTML='<p style="margin:0">Aucune histoire sauvegardée pour l\'instant. Une histoire est gardée dès que le héros a un nom.</p>';return}
+  l.sort((a,b)=>b.date-a.date);
+  z.innerHTML=l.map(r=>'<div class="hist"><button class="btn ouvre" data-a="ouvreH" data-id="'+r.id+'">📖 '+esc(r.titre)+' <small>· niveau '+r.niv+' · '+new Date(r.date).toLocaleDateString('fr-FR')+(r.fini?'':' · pas finie')+'</small></button>'+(BIB.suppr===r.id?'<span>Supprimer ?</span><button class="btn" data-a="supprOui" data-id="'+r.id+'">Oui</button><button class="btn" data-a="supprNon">Non</button>':'<button class="btn" data-a="supprH" data-id="'+r.id+'" aria-label="Supprimer cette histoire">🗑</button>')+'</div>').join('');
+}
+function nettoie(o){
+  if(typeof o==='string')return o.replace(/[<>"]/g,'');
+  if(Array.isArray(o))return o.map(nettoie);
+  if(o&&typeof o==='object'){const r={};Object.keys(o).forEach(k=>{r[nettoie(k)]=nettoie(o[k])});return r}
+  return o;
+}
+function importe(f){
+  if(!f)return;const rd=new FileReader();
+  rd.onload=async()=>{
+    try{
+      const j=nettoie(JSON.parse(rd.result));
+      if(!j.adaptconte||!j.data||!j.data.S||!j.data.S.heros)throw 0;
+      try{await archive()}catch(e){}
+      charge({id:Date.now(),data:j.data});
+      archive().catch(()=>{});
+    }catch(e){BIB.msg='Ce fichier n\'est pas une histoire Adaptconte.';const z=document.getElementById('bib-msg');if(z)z.textContent=BIB.msg}
+  };
+  rd.readAsText(f);
+}
+function telecharge(blob,nom){
+  try{
+    const f=new File([blob],nom,{type:blob.type});
+    if(/iPad|iPhone|Macintosh/.test(navigator.userAgent)&&'ontouchend' in document&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(()=>{});return}
+  }catch(e){}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();a.remove();
+}
+
+/* ---------- Vidéo du film ---------- */
+let REC=null;
+const VW=1280,VH=720,FOND=['#ffd76a','#aedcff','#b9bde0','#c9ecc0','#ffe7a3','#ffcfa8'];
+function pagesVideo(){
+  const pg=[{type:'titre',txt:titre()}];
+  for(let n=0;n<5;n++){
+    const ph=texte(n).match(/[^.!?]+[.!?]+/g)||[texte(n)];let cur='';
+    ph.forEach(x=>{x=x.trim();if(cur&&(cur+' '+x).length>170){pg.push({type:'etape',n,txt:cur});cur=x}else cur=cur?cur+' '+x:x});
+    if(cur)pg.push({type:'etape',n,txt:cur});
+  }
+  pg.push({type:'fin',txt:'Fin'});
+  return pg;
+}
+function chargeImg(src){return new Promise(ok=>{const im=new Image();im.onload=()=>ok(im);im.onerror=()=>ok(null);im.src=src})}
+function figsEtape(n){let ids=dess(n).filter(id=>T.S[id]);if(!ids.length)ids=['heros'];else if(n>1&&!ids.includes('heros'))ids.unshift('heros');return ids}
+async function prepareImgs(){
+  const m={},ids=new Set(['heros']);
+  for(let n=0;n<5;n++){const src=imgEtape(n);if(src)m['e'+n]=await chargeImg(src);figsEtape(n).forEach(id=>ids.add(id))}
+  for(const id of ids){const p=T.net&&T.pictos[id],src=T.dessins[id]||(p&&/^data:/.test(p.src)?p.src:'');if(src)m[id]=await chargeImg(src)}
+  return m;
+}
+function rr(x,X,Y,W,H,r){x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+W,Y,X+W,Y+H,r);x.arcTo(X+W,Y+H,X,Y+H,r);x.arcTo(X,Y+H,X,Y,r);x.arcTo(X,Y,X+W,Y,r);x.closePath()}
+function figure(x,imgs,id,cx,cy,t){
+  const im=imgs[id];
+  if(im){const k=Math.min(t/im.width,t/im.height);x.drawImage(im,cx-im.width*k/2,cy-im.height*k/2,im.width*k,im.height*k)}
+  else{x.fillStyle='#1b2452';x.font=Math.round(t*.8)+'px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText((T.S[id]&&T.S[id].e)||'⭐',cx,cy)}
+}
+function lignes(x,mots,larg){const L=[];let l=[];mots.forEach(m=>{if(l.length&&x.measureText(l.concat(m).join(' ')).width>larg){L.push(l);l=[m]}else l.push(m)});if(l.length)L.push(l);return L}
+function dessinePage(x,imgs,pg,nlu){
+  const FT='"Andika","Trebuchet MS","Segoe UI",sans-serif';
+  x.fillStyle='#e6f1ff';x.fillRect(0,0,VW,VH);
+  x.fillStyle='#ffffff';rr(x,30,24,VW-60,VH-48,28);x.fill();
+  if(pg.type!=='etape'){
+    x.fillStyle=FOND[0];rr(x,60,54,VW-120,VH-108,22);x.fill();
+    if(pg.type==='titre')figure(x,imgs,'heros',VW/2,250,250);
+    else{x.font='200px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('✨',VW/2,250)}
+    x.fillStyle='#1b2452';x.textAlign='center';x.textBaseline='middle';
+    let fs=88;do{fs-=4;x.font='bold '+fs+'px '+FT}while(x.measureText(pg.txt).width>VW-200&&fs>30);
+    x.fillText(pg.txt,VW/2,500);
+    return;
+  }
+  const im=imgs['e'+pg.n],zy=54,zh=420;
+  if(im){const k=Math.min((VW-120)/im.width,zh/im.height);x.drawImage(im,VW/2-im.width*k/2,zy+zh/2-im.height*k/2,im.width*k,im.height*k)}
+  else{
+    x.fillStyle=FOND[pg.n+1];rr(x,60,zy,VW-120,zh,22);x.fill();
+    const ids=figsEtape(pg.n),pas=(VW-200)/ids.length,t=Math.min(270,pas-30);
+    ids.forEach((id,i)=>figure(x,imgs,id,100+pas*(i+.5),zy+zh/2,t));
+  }
+  const mots=pg.txt.split(' ');let fs=48,L;
+  do{fs-=2;x.font=fs+'px '+FT;L=lignes(x,mots,VW-160)}while(L.length*fs*1.3>190&&fs>20);
+  const ih=fs*1.3,esp=x.measureText(' ').width;let y=494+(196-L.length*ih)/2+ih/2,k=0;
+  x.textBaseline='middle';x.textAlign='left';
+  L.forEach(l=>{let px=VW/2-x.measureText(l.join(' ')).width/2;l.forEach(m=>{x.fillStyle=k<nlu?'#1b2452':'#9aa5c8';x.fillText(m,px,y);px+=x.measureText(m).width+esp;k++});y+=ih});
+}
+function abandonneVideo(){
+  const R=REC;REC=null;if(!R)return;
+  R.annule=true;
+  try{if(R.rec&&R.rec.state!=='inactive')R.rec.stop()}catch(e){}
+  try{R.stream&&R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop())}catch(e){}
+  if(R.url)URL.revokeObjectURL(R.url);
+}
+function majBarre(){
+  const z=document.getElementById('video-barre');if(!z||!REC)return;
+  if(REC.etat==='prep'){z.innerHTML='<span>Préparation…</span>';return}
+  const der=REC.i===REC.pages.length-1;
+  z.innerHTML='<span>⏺ Enregistrement · page '+(REC.i+1)+' sur '+REC.pages.length+'</span>'+(REC.voix?'<button class="btn fort" data-a="videoSuite">'+(der?'✔ Terminer':'Page suivante ▶')+'</button>':'')+'<button class="btn" data-a="videoStop">Annuler</button>'+(REC.note?'<span>'+esc(REC.note)+'</span>':'');
+}
+function pageSuivante(){
+  const R=REC;if(!R||R.etat!=='rec')return;
+  if(R.i<R.pages.length-1){R.i++;R.t0=performance.now();majBarre()}
+  else{R.etat='stop';try{R.rec.stop()}catch(e){}}
+}
+async function demarreVideo(voix){
+  // MP4 H.264 en priorité (lisible partout). « video/mp4 » sans précision n'est gardé que pour Safari, où il veut dire H.264.
+  const ok=t=>MediaRecorder.isTypeSupported(t);
+  let type=null;
+  if(window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream){
+    type=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1.42E01E'].find(ok)||(ok('video/mp4')&&!ok('video/webm')?'video/mp4':null)||['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(ok)||null;
+  }
+  if(!type){REC={etat:'err',err:'Ce navigateur ne sait pas créer de vidéo. Essaie avec Safari sur iPad, ou avec Chrome.'};return rendVideo()}
+  const R=REC={etat:'prep',voix,type,pages:pagesVideo(),i:0,t0:0,chunks:[]};
+  rendVideo();
+  R.imgs=await prepareImgs();
+  const cv=document.getElementById('toile-video');if(!cv||REC!==R)return;
+  const x=cv.getContext('2d');
+  dessinePage(x,R.imgs,R.pages[0],voix?1e9:0);
+  try{
+    R.stream=cv.captureStream(30);
+    if(voix){try{R.mic=await navigator.mediaDevices.getUserMedia({audio:true});R.mic.getAudioTracks().forEach(t=>R.stream.addTrack(t))}catch(e){R.voix=false;R.note='Le micro n\'est pas disponible : la vidéo sera sans voix.'}}
+    if(REC!==R)return;
+    R.rec=new MediaRecorder(R.stream,{mimeType:type,videoBitsPerSecond:3000000});
+  }catch(e){REC={etat:'err',err:'La vidéo n\'a pas pu démarrer sur cet appareil.'};return rendVideo()}
+  R.rec.ondataavailable=e=>{if(e.data&&e.data.size)R.chunks.push(e.data)};
+  R.rec.onstop=()=>{
+    try{R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop())}catch(e){}
+    if(R.annule)return;
+    R.blob=new Blob(R.chunks,{type:type.split(';')[0]});R.url=URL.createObjectURL(R.blob);R.etat='fini';
+    if(REC===R&&T.view==='video')rendVideo();
+  };
+  R.rec.start();R.etat='rec';R.t0=performance.now();majBarre();
+  const boucle=()=>{
+    if(REC!==R||R.etat!=='rec')return;
+    const pg=R.pages[R.i],dt=performance.now()-R.t0,n=pg.txt.split(' ').length;
+    dessinePage(x,R.imgs,pg,R.voix?1e9:Math.floor(dt/400));
+    if(!R.voix&&dt>Math.max(2600,n*400+1600))pageSuivante();
+    requestAnimationFrame(boucle);
+  };
+  boucle();
+}
+function rendVideo(){
+  let h='<h2 class="q">🎥 La vidéo de mon histoire</h2>';
+  if(!REC)h+='<p style="margin:0">La vidéo montre les pages de ton histoire, une par une, comme un livre.</p><div class="outils"><button class="btn fort" data-a="videoGo" data-v="1">🎤 Avec ma voix : je lis mon histoire</button><button class="btn fort" data-a="videoGo" data-v="0">🔇 Sans voix</button></div><p style="margin:0">Avec ta voix, tu lis la page à voix haute, puis tu touches « Page suivante ».</p><div class="outils"><button class="btn" data-a="film">← Retour au film</button></div>';
+  else if(REC.etat==='err')h+='<p style="margin:0">'+esc(REC.err)+'</p><div class="outils"><button class="btn" data-a="film">← Retour au film</button></div>';
+  else if(REC.etat==='fini'){
+    const mp4=/mp4/.test(REC.blob.type);
+    h+='<video class="video" controls playsinline src="'+REC.url+'"></video><div class="outils"><button class="btn fort" data-a="videoGarde">💾 Enregistrer la vidéo</button><button class="btn" data-a="videoRefaire">🔁 Recommencer</button><button class="btn" data-a="film">← Retour au film</button></div>';
+    h+='<p style="margin:0;font-size:15px;color:var(--doux)">'+(mp4?'Format MP4 : cette vidéo se lit sur iPad, Android et ordinateur.':'Format WebM : cette vidéo se lit sur Android et ordinateur, mais peut ne pas se lire sur iPad. Pour un fichier MP4 lisible partout, crée la vidéo depuis Safari sur iPad ou depuis un Chrome récent.')+'</p>';
+  }else h+='<canvas id="toile-video" width="'+VW+'" height="'+VH+'"></canvas><div class="outils" id="video-barre" style="align-items:center"></div>';
+  vue.innerHTML=h;majBarre();
 }
 
 /* ---------- Actions ---------- */
@@ -989,8 +1172,8 @@ const ACT={
   voix(){T.voice=!T.voice;if(!T.voice)tais();rendChemin();sauve()},
   temps(el){T.tense=el.dataset.t;rend()},
   reprendre(){if(toutFini()){T.view='film';rend()}else ouvre(ETAPES.findIndex((e,i)=>!complet(i)))},
-  neuf(el){NIV=+el.dataset.n||1;if(Object.keys(T.S).length){confirme=true;rend()}else ACT.neufOui()},
-  neufOui(){confirme=false;T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};OPT={slot:null,items:[]};ouvre(0)},
+  neuf(el){NIV=+el.dataset.n||1;if(!Object.keys(T.S).length)return ACT.neufOui();archive().then(ok=>{if(ok||!(T.S.herosNom&&T.S.herosNom.t))ACT.neufOui();else{confirme=true;rend()}},()=>{confirme=true;rend()})},
+  neufOui(){confirme=false;T.id=Date.now();T.mode='ia';T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};OPT={slot:null,items:[]};ouvre(0)},
   neufNon(){confirme=false;rend()},
   step(el){tais();ouvre(+el.dataset.n)},
   film(){T.view='film';rend()},
@@ -1014,6 +1197,22 @@ const ACT={
   nomSans(){pose({t:''})},
   photoNon(){delete T.photos[T.step];rend()},
   passe(){pose({skip:true})},
+  async ouvreH(el){
+    const id=+el.dataset.id;
+    try{await archive()}catch(e){}
+    try{const r=await bdOp('readonly',st=>st.get(id));if(r)charge(r)}catch(e){}
+  },
+  supprH(el){BIB.suppr=+el.dataset.id;rendBiblio()},
+  supprNon(){BIB.suppr=null;rendBiblio()},
+  async supprOui(el){try{await bdOp('readwrite',st=>st.delete(+el.dataset.id))}catch(e){}BIB.suppr=null;rendBiblio()},
+  garde(){const m=t=>{const z=document.getElementById('sauv-etat');if(z)z.textContent=t};archive().then(ok=>m(ok?'Histoire sauvegardée ✔':'Rien à sauvegarder.'),()=>m('La sauvegarde n\'est pas possible ici.'))},
+  exporte(){telecharge(new Blob([JSON.stringify({adaptconte:1,titre:titre(),data:copie()})],{type:'application/json'}),nomFichier()+'.adaptconte.json')},
+  video(){tais();REC=null;T.view='video';rend()},
+  videoGo(el){demarreVideo(el.dataset.v==='1')},
+  videoSuite(){pageSuivante()},
+  videoStop(){abandonneVideo();rendVideo()},
+  videoRefaire(){abandonneVideo();rendVideo()},
+  videoGarde(){if(REC&&REC.blob)telecharge(REC.blob,nomFichier()+(/mp4/.test(REC.blob.type)?'.mp4':'.webm'))},
   net(){T.net=!T.net;rend()},
   mode(el){tais();T.mode=el.dataset.m;rend()},
   async testNet(){
@@ -1097,8 +1296,10 @@ document.getElementById('app').addEventListener('keydown',ev=>{
 document.getElementById('app').addEventListener('change',ev=>{
   if(ev.target.id==='photo-cam'||ev.target.id==='photo-lib')photo(ev.target.files[0]);
   if(ev.target.id==='url-ia'){T.urlIA=ev.target.value.trim();sauve()}
+  if(ev.target.id==='import-h')importe(ev.target.files[0]);
 });
 if(T.view!=='home'&&!Object.keys(T.S).length)T.view='home';
+if(T.view==='video')T.view='film';
 if(T.view==='film'&&!toutFini())T.view='home';
 if(T.view==='build'&&T.slot)prepareNom();
 rend();
