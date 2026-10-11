@@ -238,7 +238,7 @@ const VIDE={nom:'nom',adj:'adjectif',verbe:'verbe',name:'Nom'};
 
 /* ---------- État ---------- */
 const CLE='adaptconte-v1';
-let T={niv:1,hub:null,S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
+let T={niv:1,hub:null,pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
 try{const s=JSON.parse(localStorage.getItem(CLE)||'null');if(s&&s.S)T=Object.assign(T,s)}catch(e){}
 const sauve=()=>{try{localStorage.setItem(CLE,JSON.stringify(T))}catch(e){}};
 let NIV=1,OPT={slot:null,items:[]},DES={n:2,syl:[],roule:false},CG='m',F={i:0,playing:false,tok:0},confirme=false,libre=false;
@@ -716,7 +716,7 @@ function rendAccueil(){
   else h+='<span class="boite">Effacer l\'histoire en cours ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
   h+='</div><div class="adulte"><p class="sur">Réglage pour l\'adulte : temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
   [['ps','passé simple (il vola)'],['pc','passé composé (il a volé)'],['pr','présent (il vole)']].forEach(x=>{h+='<button class="btn'+(T.tense===x[0]?' choisi':'')+'" data-a="temps" data-t="'+x[0]+'">'+x[1]+'</button>'});
-  h+='</div></div></section>';
+  h+='</div><p class="sur">Illustrations en ligne : pictogrammes ARASAAC et images créées par IA</p><div class="outils"><button class="btn'+(T.net?' choisi':'')+'" data-a="net">'+(T.net?'Activées':'Désactivées')+'</button><input class="champ" id="url-ia" value="'+esc(T.urlIA)+'" aria-label="Adresse du service d\'images" autocomplete="off" autocapitalize="off"></div><p style="margin:0;font-size:14px;color:var(--doux)">Sans connexion, l\'appli garde les dessins et les emojis. Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p></div></section>';
   vue.innerHTML=h;
 }
 function entete(){const e=ETAPES[T.step];return '<p class="sur">Étape '+(T.step+1)+' · '+e.nom+' · '+e.aide+'</p>'}
@@ -792,7 +792,8 @@ function rendBilan(){
   h+='<p class="sur">Je dessine sur l\'écran</p><div class="boite">';
   dess(n).forEach(id=>{if(T.S[id])h+='<button class="btn" data-a="dessine" data-s="'+id+'">'+fig(id)+' '+esc(nomChose(id))+'</button>'});
   h+='<button class="btn" data-a="dessineEtape">🎨 Toute l\'étape</button></div>';
-  h+='<p class="sur">Ou je dessine sur une feuille</p>'+photoHtml(n);
+  h+='<p class="sur">Ou je dessine sur une feuille</p>'+photoHtml(n)+iaHtml(n);
+  dess(n).forEach(chercheP);
   h+='<div class="outils">'+(n<4?'<button class="btn fort" data-a="step" data-n="'+(n+1)+'">Étape suivante : '+ETAPES[n+1].court.toLowerCase()+' →</button>':'<button class="btn fort" data-a="film">🎬 Voir mon histoire</button>')+'</div>';
   vue.innerHTML=h;
 }
@@ -801,7 +802,63 @@ function rendBilan(){
 const DESS=[['heros','porte','lieu'],['mechant','porteM','objet'],['lieu3','ami'],['moyen'],[]];
 const COUL=['#1b1b1b','#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#f06292','#795548','#9e9e9e'];
 let DR=null,PEN={c:COUL[0],w:10,gomme:false};
-function fig(id){return T.dessins[id]?'<img class="dess" src="'+T.dessins[id]+'" alt="">':((T.S[id]&&T.S[id].e)||'⭐')}
+function fig(id){
+  const e=(T.S[id]&&T.S[id].e)||'⭐';
+  if(T.dessins[id])return '<img class="dess" src="'+T.dessins[id]+'" alt="">';
+  const p=T.net&&T.pictos[id];
+  if(p&&p.src)return '<img class="dess" src="'+p.src+'" alt="" data-e="'+e+'" onerror="this.outerHTML=this.dataset.e">';
+  return e;
+}
+/* ---------- Illustrations en ligne : pictogrammes ARASAAC et images créées par IA ---------- */
+const PICTO_OK=['heros','porte','lieu','mechant','porteM','objet','lieu3','ami','moyen','desir','adv','situation','renc','magie'];
+let IA={n:null,msg:''};
+const enLigne=()=>T.net&&navigator.onLine!==false;
+function imgEtape(n){return T.photos[n]||(T.net&&T.ia[n])||''}
+function motCle(it){return (it.w||it.t||'').replace(/^((dans|sur|au bord du|au|à|de|du|des|le|la|les|un|une|son|sa|ses) |l')+/i,'').trim()}
+function enData(blob){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=ko;r.readAsDataURL(blob)})}
+async function chercheP(id){
+  const it=T.S[id];
+  if(!it||!PICTO_OK.includes(id)||!enLigne())return;
+  const mot=motCle(it);if(!mot)return;
+  if(T.pictos[id]&&T.pictos[id].w===mot)return;
+  T.pictos[id]={w:mot,src:''};
+  try{
+    let liste=[];
+    for(const q of [mot,mot.split(' ')[0]]){
+      const r=await fetch('https://api.arasaac.org/api/pictograms/fr/search/'+encodeURIComponent(q));
+      if(r.ok){liste=(await r.json()).filter(x=>!x.violence&&!x.sex);if(liste.length)break}
+      if(!mot.includes(' '))break;
+    }
+    if(!liste.length){sauve();return}
+    const url='https://static.arasaac.org/pictograms/'+liste[0]._id+'/'+liste[0]._id+'_300.png';
+    let src=url;
+    try{const rep=await fetch(url);if(rep.ok)src=await enData(await rep.blob())}catch(e){}
+    if(!T.S[id]||motCle(T.S[id])!==mot)return;
+    T.pictos[id]={w:mot,src};sauve();
+    if(T.view==='recap')rend();
+  }catch(e){delete T.pictos[id]}
+}
+async function illustre(n){
+  const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:texte(n).slice(0,1400),personnages:(texte(0)+(n>0?' '+texte(1):'')).slice(0,900),seed:Math.floor(Math.random()*1e6)})});
+  const j=await r.json();
+  if(!j.image)throw new Error(j.erreur||'vide');
+  const im=new Image();
+  await new Promise((ok,ko)=>{im.onload=ok;im.onerror=ko;im.src='data:image/jpeg;base64,'+j.image});
+  const k=Math.min(1,768/Math.max(im.width,im.height)),c=document.createElement('canvas');
+  c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  T.ia[n]=c.toDataURL('image/jpeg',.8);sauve();
+}
+const IA_KO="Pas d'illustration pour l'instant : pas de connexion ou service indisponible. Tes dessins sont gardés.";
+function iaHtml(n){
+  if(!T.net)return '';
+  let h='<p class="sur">Ou une illustration créée par l\'ordinateur</p><div class="boite">';
+  if(T.ia[n])h+='<img class="vignette" src="'+T.ia[n]+'" alt="Illustration"><button class="btn" data-a="iaNon">🗑 Enlever</button>';
+  h+='<button class="btn" data-a="ia"'+(IA.n!==null?' disabled':'')+'>✨ '+(T.ia[n]?'Refaire':'Créer')+' une illustration</button>';
+  if(IA.msg)h+='<span>'+esc(IA.msg)+'</span>';
+  if(T.photos[n]&&T.ia[n])h+='<span>Dans le film, c\'est ton dessin qui est montré.</span>';
+  return h+'</div>';
+}
+function creditHtml(){return T.net&&Object.keys(T.pictos).some(k=>T.pictos[k].src)?'<p style="margin:0;font-size:14px;color:var(--doux)">Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p>':''}
 function dess(n){if(T.niv<2)return DESS[n];const A=actifs();return DESS2[n].filter(id=>A.has(id)&&T.S[id])}
 function nomChose(id){const it=T.S[id];if(T.niv>=2)return it.le||it.t||leN(it);return SL[id].k==='nom'?leN(it):it.t}
 function rendDessin(){
@@ -812,7 +869,7 @@ function rendDessin(){
   h+='</div><div class="rang">';
   [4,10,22].forEach(w=>{h+='<button class="btn taille" data-a="taille" data-w="'+w+'" aria-label="Taille du crayon"><i style="width:'+w+'px;height:'+w+'px"></i></button>'});
   h+='<button class="btn" data-a="gomme" id="gomme">Gomme</button></div><div class="rang"><button class="btn" data-a="defaire">↩ Défaire</button><button class="btn" data-a="efface">🗑 Tout effacer</button></div></div></div>';
-  h+='<div class="outils"><button class="btn fort" data-a="dessinOk">✔ J\'ai fini</button><button class="btn" data-a="dessinNon">Annuler</button></div>';
+  h+='<div class="outils"><button class="btn fort" data-a="dessinOk">✔ J\'ai fini</button><button class="btn" data-a="dessinNon">Annuler</button>'+(!et&&T.net&&T.pictos[DR.id]&&T.pictos[DR.id].src?'<button class="btn" data-a="pictoNon">🗑 Enlever l\'image trouvée</button>':'')+'</div>';
   vue.innerHTML=h;majPalette();initToile();
 }
 function majPalette(){
@@ -841,7 +898,7 @@ function prepareImpression(){
   let h='<h1>'+esc(titre())+'</h1><p class="auteur">Une histoire inventée par ................................................</p>';
   ETAPES.forEach((e,i)=>{
     h+='<section><h2>'+(i+1)+'. '+e.court+' <small>('+e.nom.toLowerCase()+')</small></h2><p>'+esc(texte(i))+'</p><div>';
-    if(T.photos[i])h+='<figure><img class="ill" src="'+T.photos[i]+'" alt=""></figure>';
+    if(imgEtape(i))h+='<figure><img class="ill" src="'+imgEtape(i)+'" alt=""></figure>';
     dess(i).forEach(id=>{if(T.dessins[id])h+='<figure><img class="mini dess" src="'+T.dessins[id]+'" alt=""><figcaption>'+esc(nomChose(id))+'</figcaption></figure>'});
     h+='</div></section>';
   });
@@ -854,7 +911,7 @@ function sceneHtml(i){
   if(i===0)return '<div class="scene s0"><div class="carton"><span class="pop">'+fig('heros')+'</span><strong>'+esc(titre())+'</strong></div></div>';
   if(i===6)return '<div class="scene s0"><div class="carton"><span class="brille">✨</span><strong style="font-size:1em">Fin</strong></div></div>';
   const n=i-1;
-  if(T.photos[n])return '<div class="scene s'+i+'"><img class="plein" src="'+T.photos[n]+'" alt="Mon dessin de l\'étape '+i+'"></div>';
+  if(imgEtape(n))return '<div class="scene s'+i+'"><img class="plein" src="'+imgEtape(n)+'" alt="Mon dessin de l\'étape '+i+'"></div>';
   let h='<div class="scene s'+i+'">';
   if(T.niv>=2){
     const brut=(x,cl,st)=>'<span class="e '+cl+'" style="'+st+'">'+x+'</span>';
@@ -877,7 +934,7 @@ function rendFilm(){
   let h='<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
   h+='<article class="conte"><h2>'+esc(titre())+'</h2>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
-  h+='</article><div class="outils"><button class="btn fort" data-a="imprime">🖨 Imprimer mon histoire</button><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
+  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="imprime">🖨 Imprimer mon histoire</button><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
   vue.innerHTML=h;
   prepareImpression();
   cadre(0,true);
@@ -904,13 +961,13 @@ function cadre(i,muet){
 
 /* ---------- Actions ---------- */
 function ouvre(n){
-  T.step=n;libre=false;T.hub=null;
+  T.step=n;libre=false;T.hub=null;if(IA.n===null)IA.msg='';
   const vide=slots(n).find(id=>T.S[id]===undefined);
   if(vide){T.view='build';T.slot=vide;prepareNom()}else T.view='recap';
   rend();
 }
 function prepareNom(){if(SL[T.slot].k==='name'){const v=T.S[T.slot];DES={n:(v&&v.syl&&v.syl.length)||2,syl:(v&&v.syl)?v.syl.slice():[],roule:false}}}
-function pose(v){T.S[T.slot]=v;OPT={slot:null,items:[]};if(T.hub){T.slot=T.hub;T.hub=null;T.view='build';rend()}else ouvre(T.step)}
+function pose(v){T.S[T.slot]=v;OPT={slot:null,items:[]};chercheP(T.slot);if(T.hub){T.slot=T.hub;T.hub=null;T.view='build';rend()}else ouvre(T.step)}
 function photo(f){
   if(!f)return;const r=new FileReader();
   r.onload=()=>{const im=new Image();im.onload=()=>{
@@ -926,7 +983,7 @@ const ACT={
   temps(el){T.tense=el.dataset.t;rend()},
   reprendre(){if(toutFini()){T.view='film';rend()}else ouvre(ETAPES.findIndex((e,i)=>!complet(i)))},
   neuf(el){NIV=+el.dataset.n||1;if(Object.keys(T.S).length){confirme=true;rend()}else ACT.neufOui()},
-  neufOui(){confirme=false;T.niv=NIV;T.S={};T.photos={};T.dessins={};OPT={slot:null,items:[]};ouvre(0)},
+  neufOui(){confirme=false;T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};OPT={slot:null,items:[]};ouvre(0)},
   neufNon(){confirme=false;rend()},
   step(el){tais();ouvre(+el.dataset.n)},
   film(){T.view='film';rend()},
@@ -950,6 +1007,27 @@ const ACT={
   nomSans(){pose({t:''})},
   photoNon(){delete T.photos[T.step];rend()},
   passe(){pose({skip:true})},
+  net(){T.net=!T.net;rend()},
+  pictoNon(){T.pictos[DR.id].src='';DR=null;T.view='recap';rend()},
+  iaNon(){delete T.ia[T.step];rend()},
+  async ia(){
+    if(IA.n!==null)return;
+    const n=T.step;IA={n,msg:'L\'illustration arrive…'};rend();
+    try{await illustre(n);IA={n:null,msg:''}}catch(e){IA={n:null,msg:IA_KO}}
+    if(T.view==='recap')rend();
+  },
+  async iaTout(){
+    if(IA.n!==null)return;
+    const etat=m=>{IA.msg=m;const el=document.getElementById('ia-etat');if(el)el.textContent=m};
+    let ko=false;
+    for(let n=0;n<5&&!ko;n++){
+      if(imgEtape(n))continue;
+      IA.n=n;etat('Illustration de l\'étape '+(n+1)+' sur 5…');
+      try{await illustre(n)}catch(e){ko=true}
+    }
+    IA={n:null,msg:ko?IA_KO:''};
+    if(T.view==='film')rend();
+  },
   sous(el){T.hub=T.slot;T.slot=el.dataset.s;OPT={slot:null,items:[]};rend()},
   hubOk(){T.hub=null;pose({done:1})},
   hubRetour(){T.slot=T.hub;T.hub=null;rend()},
@@ -991,6 +1069,7 @@ document.getElementById('app').addEventListener('keydown',ev=>{
 });
 document.getElementById('app').addEventListener('change',ev=>{
   if(ev.target.id==='photo-cam'||ev.target.id==='photo-lib')photo(ev.target.files[0]);
+  if(ev.target.id==='url-ia'){T.urlIA=ev.target.value.trim();sauve()}
 });
 if(T.view!=='home'&&!Object.keys(T.S).length)T.view='home';
 if(T.view==='film'&&!toutFini())T.view='home';
