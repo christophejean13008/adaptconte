@@ -716,7 +716,7 @@ function rendAccueil(){
   else h+='<span class="boite">Effacer l\'histoire en cours ? <button class="btn" data-a="neufOui">Oui, effacer</button><button class="btn" data-a="neufNon">Non</button></span>';
   h+='</div><div class="adulte"><p class="sur">Réglage pour l\'adulte : temps du récit au niveau 1 (les niveaux 2 et 3 sont au passé simple)</p><div class="outils">';
   [['ps','passé simple (il vola)'],['pc','passé composé (il a volé)'],['pr','présent (il vole)']].forEach(x=>{h+='<button class="btn'+(T.tense===x[0]?' choisi':'')+'" data-a="temps" data-t="'+x[0]+'">'+x[1]+'</button>'});
-  h+='</div><p class="sur">Illustrations en ligne : pictogrammes ARASAAC et images créées par IA</p><div class="outils"><button class="btn'+(T.net?' choisi':'')+'" data-a="net">'+(T.net?'Activées':'Désactivées')+'</button><input class="champ" id="url-ia" value="'+esc(T.urlIA)+'" aria-label="Adresse du service d\'images" autocomplete="off" autocapitalize="off"></div><p style="margin:0;font-size:14px;color:var(--doux)">Sans connexion, l\'appli garde les dessins et les emojis. Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p></div></section>';
+  h+='</div><p class="sur">Illustrations en ligne : pictogrammes ARASAAC et images créées par IA</p><div class="outils"><button class="btn'+(T.net?' choisi':'')+'" data-a="net">'+(T.net?'Activées':'Désactivées')+'</button><input class="champ" id="url-ia" value="'+esc(T.urlIA)+'" aria-label="Adresse du service d\'images" autocomplete="off" autocapitalize="off"><button class="btn" data-a="testNet">Tester les illustrations</button></div><div id="diag" style="font-size:15px;display:grid;gap:4px"></div><p style="margin:0;font-size:14px;color:var(--doux)">Sans connexion, l\'appli garde les dessins et les emojis. Pictogrammes : Sergio Palao, ARASAAC (arasaac.org), Gouvernement d\'Aragon, licence CC BY-NC-SA.</p></div></section>';
   vue.innerHTML=h;
 }
 function entete(){const e=ETAPES[T.step];return '<p class="sur">Étape '+(T.step+1)+' · '+e.nom+' · '+e.aide+'</p>'}
@@ -1008,6 +1008,25 @@ const ACT={
   photoNon(){delete T.photos[T.step];rend()},
   passe(){pose({skip:true})},
   net(){T.net=!T.net;rend()},
+  async testNet(){
+    const z=document.getElementById('diag');if(!z)return;
+    const ligne=(ok,m)=>{const p=document.createElement('p');p.style.margin='0';p.textContent=(ok?'✅ ':'❌ ')+m;z.appendChild(p)};
+    z.textContent='Test en cours…';
+    const res=[];
+    try{const r=await fetch('https://api.arasaac.org/api/pictograms/fr/search/chat');const j=await r.json();res.push([j.length>0,'Pictogrammes ARASAAC : '+(j.length>0?'ça marche.':'aucun résultat.')])}
+    catch(e){res.push([false,'Pictogrammes ARASAAC : injoignables depuis cette page (pas de connexion, réseau qui bloque arasaac.org, ou aperçu Claude).'])}
+    try{
+      const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:'Un chat dort au soleil.',personnages:'',seed:1})});
+      const j=await r.json().catch(()=>({}));
+      if(r.ok&&j.image)res.push([true,'Images par IA : ça marche.']);
+      else if(r.status===403)res.push([false,'Images par IA : le service refuse cette adresse ('+location.origin+'). Il faut l\'ajouter à la liste ORIGINES du code Cloudflare.']);
+      else if(/run|binding|AI/.test(j.erreur||''))res.push([false,'Images par IA : le service existe, mais la liaison Workers AI nommée AI manque (étape 3 de l\'installation). Détail : '+j.erreur]);
+      else res.push([false,'Images par IA : le service répond une erreur '+r.status+'. Détail : '+(j.erreur||'aucun')]);
+    }catch(e){
+      res.push([false,'Images par IA : service injoignable depuis cette page. Soit le service adaptconte-images n\'est pas encore créé sur Cloudflare, soit cette page n\'est pas ouverte depuis GitHub Pages ou boussoleebep.fr (adresse actuelle : '+(location.protocol==='file:'?'fichier sur l\'appareil':location.origin)+'), soit le réseau bloque workers.dev.']);
+    }
+    z.textContent='';res.forEach(x=>ligne(x[0],x[1]));
+  },
   pictoNon(){T.pictos[DR.id].src='';DR=null;T.view='recap';rend()},
   iaNon(){delete T.ia[T.step];rend()},
   async ia(){
