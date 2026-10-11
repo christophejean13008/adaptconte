@@ -800,7 +800,8 @@ function photoHtml(n){
 }
 function rendBilan(){
   const n=T.step;
-  let h=entete()+'<h2>Bravo ! Voici ta phrase.</h2><div class="phrase grand'+(T.niv>=2?' dense':'')+'">'+phraseHtml(n,null)+'</div>';
+  const suite=n<4?'<button class="btn fort" data-a="step" data-n="'+(n+1)+'">Étape suivante →</button>':'<button class="btn fort" data-a="film">🎬 Voir mon histoire</button>';
+  let h=entete()+'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><h2>Bravo ! Voici ta phrase.</h2>'+suite+'</div><div class="phrase grand'+(T.niv>=2?' dense':'')+'">'+phraseHtml(n,null)+'</div>';
   h+='<div class="outils"><button class="btn" data-a="dis" data-t="'+esc(texte(n))+'">🔊 Écouter ma phrase</button><span style="align-self:center">Touche un mot coloré pour le changer.</span></div>';
   if(T.niv===3&&HUBS[n].length){h+='<p class="sur">J\'ajoute des détails</p><div class="boite">';HUBS[n].forEach(x=>{h+='<button class="btn" data-a="slot" data-s="'+x+'">✏️ '+esc(SL[x].titre())+'</button>'});h+='</div>'}
   h+='<p class="sur">Je dessine sur l\'écran</p><div class="boite">';
