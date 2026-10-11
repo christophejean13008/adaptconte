@@ -176,22 +176,37 @@ h1,h2{font-family:var(--titre);margin:0;line-height:1.1;text-wrap:balance}
 .taille{padding:0;width:54px;justify-content:center}
 .taille i{display:block;border-radius:50%;background:var(--encre)}
 .taille.choisi i{background:#fff}
-/* Impression */
+/* Impression : la même feuille sert à l'aperçu à l'écran et à l'impression */
 #impression{display:none}
+.feuille{color:#000;background:#fff;font-size:15pt;line-height:1.5}
+.feuille h1{font-size:28pt;margin:0}
+.feuille .auteur{margin:4pt 0 0;font-size:12pt;max-width:none}
+.feuille section{break-inside:avoid;border-top:1pt solid #888;margin-top:14pt;padding-top:8pt;overflow:hidden}
+.feuille h2{font-size:15pt;margin:0}
+.feuille h2 small{font-family:var(--corps);font-weight:400;font-size:10pt;color:#444}
+.feuille p{margin:4pt 0;max-width:none}
+.feuille figure{display:inline-block;vertical-align:top;margin:6pt 10pt 0 0;text-align:center;font-size:10pt}
+.feuille .ill{max-width:100%;max-height:8cm;border:1pt solid #000;border-radius:6pt;display:block}
+.feuille .mini{display:block;height:3cm;width:3cm;font-size:2.2cm;line-height:3cm}
+.feuille .mini .dess{width:3cm;height:3cm}
+.feuille.compact{font-size:12pt;line-height:1.35}
+.feuille.compact h1{font-size:18pt}
+.feuille.compact .auteur{font-size:10pt;margin:0}
+.feuille.compact section{margin-top:6pt;padding-top:4pt}
+.feuille.compact h2{font-size:12pt}
+.feuille.compact .images{float:right;margin:0 0 4pt 10pt;max-width:44%;text-align:right}
+.feuille.compact figure{margin:0 0 0 6pt}
+.feuille.compact .ill{max-height:4.2cm}
+.feuille.compact .mini{height:1.8cm;width:1.8cm;font-size:1.3cm;line-height:1.8cm}
+.feuille.compact .mini .dess{width:1.8cm;height:1.8cm}
+.feuille.compact figcaption{display:none}
+.apercu-cadre{overflow-x:auto;border-radius:12px;background:#8c93ad;padding:12px}
+.apercu{box-sizing:border-box;width:202mm;padding:8mm;margin-inline:auto;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 @media print{
-  @page{margin:1.5cm}
+  @page{margin:1.2cm}
   html,body{height:auto;background:#fff}
   #app{display:none}
-  #impression{display:block;color:#000;font-size:15pt;line-height:1.5}
-  #impression h1{font-size:30pt;margin:0}
-  #impression .auteur{margin:4pt 0 0;font-size:12pt}
-  #impression section{break-inside:avoid;border-top:1pt solid #888;margin-top:14pt;padding-top:8pt}
-  #impression h2{font-size:15pt;margin:0}
-  #impression h2 small{font-family:var(--corps);font-weight:400;font-size:10pt;color:#444}
-  #impression p{margin:4pt 0}
-  #impression figure{display:inline-block;vertical-align:top;margin:6pt 10pt 0 0;text-align:center;font-size:10pt}
-  #impression .ill{max-width:100%;max-height:8cm;border:1pt solid #000;border-radius:6pt}
-  #impression .mini{height:3.4cm;width:3.4cm}
+  #impression{display:block}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -249,7 +264,7 @@ const VIDE={nom:'nom',adj:'adjectif',verbe:'verbe',name:'Nom'};
 
 /* ---------- État ---------- */
 const CLE='adaptconte-v1';
-let T={niv:1,hub:null,mode:'ia',pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
+let T={niv:1,hub:null,auteur:'',dernierAuteur:'',imp:{q:'ia',c:true},mode:'ia',pictos:{},ia:{},net:true,urlIA:'https://adaptconte-images.chris333j.workers.dev',S:{},photos:{},dessins:{},tense:'ps',voice:true,view:'home',step:0,slot:null};
 try{const s=JSON.parse(localStorage.getItem(CLE)||'null');if(s&&s.S)T=Object.assign(T,s)}catch(e){}
 const sauve=()=>{try{localStorage.setItem(CLE,JSON.stringify(T))}catch(e){}};
 let NIV=1,OPT={slot:null,items:[]},DES={n:2,syl:[],roule:false},CG='m',F={i:0,playing:false,tok:0},confirme=false,libre=false;
@@ -699,10 +714,10 @@ function melange(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor
 function rendChemin(){
   let h='<button class="rond" data-a="home" aria-label="Accueil">🏠</button><div class="etapes">';
   ETAPES.forEach((e,i)=>{
-    const ok=i===0||complet(i-1),ici=T.view!=='home'&&T.view!=='film'&&T.step===i;
+    const ok=i===0||complet(i-1),ici=['build','recap','draw'].includes(T.view)&&T.step===i;
     h+='<button class="etape'+(complet(i)?' fait':'')+(ici?' ici':'')+'" data-a="step" data-n="'+i+'"'+(ok?'':' disabled')+' title="'+e.nom+'"><b>'+(complet(i)&&!ici?'✓':i+1)+'</b><span>'+e.court+'</span></button>';
   });
-  h+='<button class="etape'+(T.view==='film'?' ici':'')+'" data-a="film"'+(toutFini()?'':' disabled')+' title="Mon histoire animée"><b>🎬</b><span>Mon film</span></button></div>';
+  h+='<button class="etape'+(['film','video','print'].includes(T.view)?' ici':'')+'" data-a="film"'+(toutFini()?'':' disabled')+' title="Mon histoire animée"><b>🎬</b><span>Mon film</span></button></div>';
   h+='<button class="rond" data-a="voix" aria-label="Voix">'+(T.voice?'🔊':'🔇')+'</button>';
   chemin.innerHTML=h;
 }
@@ -716,6 +731,8 @@ function rend(){
   else if(T.view==='recap')rendBilan();
   else if(T.view==='draw')rendDessin();
   else if(T.view==='video')rendVideo();
+  else if(T.view==='print')rendImpression();
+  else if(T.view==='auteur')rendAuteur();
   else rendFilm();
   sauve();
 }
@@ -910,15 +927,51 @@ function initToile(){
   c.addEventListener('pointermove',e=>{if(!der)return;e.preventDefault();const p=pt(e);trait(der,p);der=p});
   const fin=()=>{der=null};c.addEventListener('pointerup',fin);c.addEventListener('pointercancel',fin);
 }
-function prepareImpression(){
-  let h='<h1>'+esc(titre())+'</h1><p class="auteur">Une histoire inventée par ................................................</p>';
+function feuilleHtml(){
+  const q=T.imp.q,compact=T.imp.c;
+  let h='<h1>'+esc(titre())+'</h1><p class="auteur">Une histoire inventée par '+(T.auteur?esc(T.auteur):'................................................')+'</p>';
   ETAPES.forEach((e,i)=>{
-    h+='<section><h2>'+(i+1)+'. '+e.court+' <small>('+e.nom.toLowerCase()+')</small></h2><p>'+esc(texte(i))+'</p><div>';
-    if(imgEtape(i))h+='<figure><img class="ill" src="'+imgEtape(i)+'" alt=""></figure>';
-    dess(i).forEach(id=>{if(T.dessins[id])h+='<figure><img class="mini dess" src="'+T.dessins[id]+'" alt=""><figcaption>'+esc(nomChose(id))+'</figcaption></figure>'});
-    h+='</div></section>';
+    let im='';
+    const mini=id=>'<figure><span class="mini">'+fig(id)+'</span><figcaption>'+esc(nomChose(id))+'</figcaption></figure>';
+    if(q==='ia'&&T.ia[i])im='<figure><img class="ill" src="'+T.ia[i]+'" alt=""></figure>';
+    if(q==='base'){
+      if(T.photos[i])im='<figure><img class="ill" src="'+T.photos[i]+'" alt=""></figure>'+dess(i).filter(id=>T.dessins[id]).map(mini).join('');
+      else im=figsEtape(i).map(mini).join('');
+    }
+    if(im)im='<div class="images">'+im+'</div>';
+    h+='<section>'+(compact?im:'')+'<h2>'+(i+1)+'. '+e.court+' <small>('+e.nom.toLowerCase()+')</small></h2><p>'+esc(texte(i))+'</p>'+(compact?'':im)+'</section>';
   });
-  document.getElementById('impression').innerHTML=h;
+  return h;
+}
+function prepareImpression(){
+  const z=document.getElementById('impression');
+  z.className='feuille'+(T.imp.c?' compact':'');z.innerHTML=feuilleHtml();
+}
+function comptePages(){
+  const a=document.getElementById('apercu');if(!a||T.view!=='print')return;
+  const mm=96/25.4,utile=(297-24)*mm,nb=()=>Math.max(1,Math.ceil((a.scrollHeight-16*mm)/utile));
+  const ici=nb();a.classList.toggle('compact');const autre=nb();a.classList.toggle('compact');
+  const txt=n=>' · environ '+n+(n>1?' pages':' page');
+  const g=document.getElementById('pg-grand'),c=document.getElementById('pg-compact');
+  if(g)g.textContent=txt(T.imp.c?autre:ici);if(c)c.textContent=txt(T.imp.c?ici:autre);
+}
+function rendImpression(){
+  const b=(a,v,cur,lab,sup)=>'<button class="btn'+(cur?' choisi':'')+'" data-a="'+a+'" data-v="'+v+'">'+lab+(sup||'')+'</button>';
+  if(T.imp.q==='ia'&&!aIA())T.imp.q='base';
+  let h='<h2 class="q">🖨 Imprimer mon histoire</h2><p class="sur">Ce que j\'imprime</p><div class="outils">'+b('impQuoi','texte',T.imp.q==='texte','Le texte seulement')+(aIA()?b('impQuoi','ia',T.imp.q==='ia','Le texte et les images de l\'ordinateur'):'')+b('impQuoi','base',T.imp.q==='base','Le texte et mes dessins')+'</div>';
+  h+='<p class="sur">Mise en page</p><div class="outils">'+b('impPage','1',T.imp.c,'Compacte : économise le papier','<span id="pg-compact"></span>')+b('impPage','0',!T.imp.c,'Grande écriture','<span id="pg-grand"></span>')+'</div>';
+  h+='<div class="outils"><button class="btn fort" data-a="imprimeGo">🖨 Imprimer</button><button class="btn" data-a="film">← Retour au film</button></div>';
+  h+='<p class="sur">Aperçu de la feuille</p><div class="apercu-cadre"><div class="apercu feuille'+(T.imp.c?' compact':'')+'" id="apercu">'+feuilleHtml()+'</div></div>';
+  vue.innerHTML=h;prepareImpression();
+  setTimeout(comptePages,150);setTimeout(comptePages,900);
+}
+function rendAuteur(){
+  vue.innerHTML='<h2 class="q">Comment t\'appelles-tu ?</h2><p style="margin:0">Ton prénom sera écrit sur ton histoire.</p><div class="boite"><input class="champ" id="auteur" value="'+esc(T.auteur||T.dernierAuteur||'')+'" autocomplete="off" maxlength="30" placeholder="Mon prénom"><button class="btn fort" data-a="auteurOk">OK</button></div><div class="outils"><button class="btn" data-a="auteurSans">Passer</button></div>';
+}
+function apresAuteur(){
+  if(!Object.keys(T.S).length)return ouvre(0);
+  if(toutFini()){T.view='film';return rend()}
+  ACT.reprendre();
 }
 
 /* ---------- Film ---------- */
@@ -948,7 +1001,7 @@ function sceneHtml(i){
 const cadreTexte=i=>i===0?titre():i===6?'Fin.':texte(i-1);
 function rendFilm(){
   let h=(aIA()?'<div class="centre"><button class="btn'+(T.mode!=='moi'?' choisi':'')+'" data-a="mode" data-m="ia">📖 Avec les images de l\'ordinateur</button><button class="btn'+(T.mode==='moi'?' choisi':'')+'" data-a="mode" data-m="moi">🎨 Avec mes dessins</button></div>':'')+'<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
-  h+='<article class="conte"><h2>'+esc(titre())+'</h2>';
+  h+='<article class="conte"><h2>'+esc(titre())+'</h2><p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(T.auteur?'Une histoire inventée par '+esc(T.auteur):'')+'<button class="btn" data-a="auteur">✏️ '+(T.auteur?'Changer le prénom':'Écrire mon prénom')+'</button></p>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
   h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><button class="btn" data-a="exporte">📤 Fichier à partager</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
   vue.innerHTML=h;
@@ -980,16 +1033,16 @@ function cadre(i,muet){
 let BIB={msg:'',suppr:null};
 function bd(){return new Promise((ok,ko)=>{try{const r=indexedDB.open('adaptconte',1);r.onupgradeneeded=()=>r.result.createObjectStore('histoires',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
 async function bdOp(mode,fn){const d=await bd();return new Promise((ok,ko)=>{const tx=d.transaction('histoires',mode),rq=fn(tx.objectStore('histoires'));tx.oncomplete=()=>ok(rq&&rq.result);tx.onerror=()=>ko(tx.error);tx.onabort=()=>ko(tx.error)})}
-const copie=()=>JSON.parse(JSON.stringify({niv:T.niv,S:T.S,photos:T.photos,dessins:T.dessins,pictos:T.pictos,ia:T.ia,mode:T.mode,tense:T.tense}));
-const nomFichier=()=>titre().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^0-9a-zA-Z]+/g,'-').replace(/^-|-$/g,'')||'mon-histoire';
+const copie=()=>JSON.parse(JSON.stringify({auteur:T.auteur,niv:T.niv,S:T.S,photos:T.photos,dessins:T.dessins,pictos:T.pictos,ia:T.ia,mode:T.mode,tense:T.tense}));
+const nomFichier=()=>(titre()+(T.auteur?' par '+T.auteur:'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^0-9a-zA-Z]+/g,'-').replace(/^-|-$/g,'')||'mon-histoire';
 async function archive(){
   if(!(T.S.herosNom&&T.S.herosNom.t))return false;
   if(!T.id)T.id=Date.now();
-  await bdOp('readwrite',st=>st.put({id:T.id,titre:titre(),date:Date.now(),niv:T.niv,fini:toutFini(),data:copie()}));
+  await bdOp('readwrite',st=>st.put({id:T.id,auteur:T.auteur,titre:titre(),date:Date.now(),niv:T.niv,fini:toutFini(),data:copie()}));
   sauve();return true;
 }
 function charge(r){
-  Object.assign(T,{hub:null,photos:{},dessins:{},pictos:{},ia:{},mode:'ia'},r.data,{id:r.id});
+  Object.assign(T,{hub:null,auteur:'',photos:{},dessins:{},pictos:{},ia:{},mode:'ia'},r.data,{id:r.id});
   OPT={slot:null,items:[]};BIB.msg='';
   if(toutFini()){T.view='film';rend()}else ouvre(Math.max(0,[0,1,2,3,4].findIndex(i=>!complet(i))));
 }
@@ -1000,7 +1053,7 @@ async function rendBiblio(){
   if(!l){z.innerHTML='<p style="margin:0">La sauvegarde des histoires n\'est pas disponible ici.</p>';return}
   if(!l.length){z.innerHTML='<p style="margin:0">Aucune histoire sauvegardée pour l\'instant. Une histoire est gardée dès que le héros a un nom.</p>';return}
   l.sort((a,b)=>b.date-a.date);
-  z.innerHTML=l.map(r=>'<div class="hist"><button class="btn ouvre" data-a="ouvreH" data-id="'+r.id+'">📖 '+esc(r.titre)+' <small>· niveau '+r.niv+' · '+new Date(r.date).toLocaleDateString('fr-FR')+(r.fini?'':' · pas finie')+'</small></button>'+(BIB.suppr===r.id?'<span>Supprimer ?</span><button class="btn" data-a="supprOui" data-id="'+r.id+'">Oui</button><button class="btn" data-a="supprNon">Non</button>':'<button class="btn" data-a="supprH" data-id="'+r.id+'" aria-label="Supprimer cette histoire">🗑</button>')+'</div>').join('');
+  z.innerHTML=l.map(r=>'<div class="hist"><button class="btn ouvre" data-a="ouvreH" data-id="'+r.id+'">📖 '+esc(r.titre)+' <small>'+(r.auteur?'· par '+esc(r.auteur)+' ':'')+'· niveau '+r.niv+' · '+new Date(r.date).toLocaleDateString('fr-FR')+(r.fini?'':' · pas finie')+'</small></button>'+(BIB.suppr===r.id?'<span>Supprimer ?</span><button class="btn" data-a="supprOui" data-id="'+r.id+'">Oui</button><button class="btn" data-a="supprNon">Non</button>':'<button class="btn" data-a="supprH" data-id="'+r.id+'" aria-label="Supprimer cette histoire">🗑</button>')+'</div>').join('');
 }
 function nettoie(o){
   if(typeof o==='string')return o.replace(/[<>"]/g,'');
@@ -1067,7 +1120,8 @@ function dessinePage(x,imgs,pg,nlu){
     else{x.font='200px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('✨',VW/2,250)}
     x.fillStyle='#1b2452';x.textAlign='center';x.textBaseline='middle';
     let fs=88;do{fs-=4;x.font='bold '+fs+'px '+FT}while(x.measureText(pg.txt).width>VW-200&&fs>30);
-    x.fillText(pg.txt,VW/2,500);
+    x.fillText(pg.txt,VW/2,pg.type==='titre'&&T.auteur?480:500);
+    if(pg.type==='titre'&&T.auteur){x.font='40px '+FT;x.fillText('par '+T.auteur,VW/2,570)}
     return;
   }
   const im=imgs['e'+pg.n],zy=54,zh=420;
@@ -1174,7 +1228,7 @@ const ACT={
   temps(el){T.tense=el.dataset.t;rend()},
   reprendre(){if(toutFini()){T.view='film';rend()}else ouvre(ETAPES.findIndex((e,i)=>!complet(i)))},
   neuf(el){NIV=+el.dataset.n||1;if(!Object.keys(T.S).length)return ACT.neufOui();archive().then(ok=>{if(ok||!(T.S.herosNom&&T.S.herosNom.t))ACT.neufOui();else{confirme=true;rend()}},()=>{confirme=true;rend()})},
-  neufOui(){confirme=false;T.id=Date.now();T.mode='ia';T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};OPT={slot:null,items:[]};ouvre(0)},
+  neufOui(){confirme=false;T.id=Date.now();T.mode='ia';T.niv=NIV;T.S={};T.photos={};T.dessins={};T.pictos={};T.ia={};T.auteur='';OPT={slot:null,items:[]};T.view='auteur';rend()},
   neufNon(){confirme=false;rend()},
   step(el){tais();ouvre(+el.dataset.n)},
   film(){T.view='film';rend()},
@@ -1278,7 +1332,13 @@ const ACT={
     DR=null;T.view='recap';rend();
   },
   dessinNon(){DR=null;T.view='recap';rend()},
-  imprime(){tais();prepareImpression();try{window.print()}catch(e){}},
+  imprime(){tais();T.view='print';rend()},
+  imprimeGo(){prepareImpression();try{window.print()}catch(e){}},
+  impQuoi(el){T.imp.q=el.dataset.v;rend()},
+  impPage(el){T.imp.c=el.dataset.v==='1';rend()},
+  auteur(){tais();T.view='auteur';rend()},
+  auteurOk(){const v=(document.getElementById('auteur').value||'').trim().slice(0,30);T.auteur=v;if(v)T.dernierAuteur=v;apresAuteur()},
+  auteurSans(){apresAuteur()},
   joue(){if(F.playing){F.playing=false;F.tok++;tais();boutonJoue()}else{F.playing=true;cadre(F.i>=6?0:F.i)}},
   avant(){cadre(Math.max(0,F.i-1))},
   apres(){cadre(Math.min(6,F.i+1))}
@@ -1290,6 +1350,7 @@ document.getElementById('app').addEventListener('click',ev=>{
 document.getElementById('app').addEventListener('keydown',ev=>{
   if(ev.key==='Enter'){
     if(ev.target.id==='mon-idee')ACT.libreOk();
+    else if(ev.target.id==='auteur')ACT.auteurOk();
     else if(ev.target.id==='mon-nom')ACT.nomLibre();
     else if(ev.target.classList.contains('carte'))ev.target.click();
   }
@@ -1300,7 +1361,8 @@ document.getElementById('app').addEventListener('change',ev=>{
   if(ev.target.id==='import-h')importe(ev.target.files[0]);
 });
 if(T.view!=='home'&&!Object.keys(T.S).length)T.view='home';
-if(T.view==='video')T.view='film';
+if(T.view==='video'||T.view==='print')T.view='film';
+if(T.view==='auteur')T.view=Object.keys(T.S).length&&toutFini()?'film':'home';
 if(T.view==='film'&&!toutFini())T.view='home';
 if(T.view==='build'&&T.slot)prepareNom();
 rend();
