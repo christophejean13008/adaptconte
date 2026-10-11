@@ -1003,7 +1003,7 @@ function rendFilm(){
   let h=(aIA()?'<div class="centre"><button class="btn'+(T.mode!=='moi'?' choisi':'')+'" data-a="mode" data-m="ia">📖 Avec les images de l\'ordinateur</button><button class="btn'+(T.mode==='moi'?' choisi':'')+'" data-a="mode" data-m="moi">🎨 Avec mes dessins</button></div>':'')+'<div id="scene"></div><p class="legende" id="legende"></p><div class="centre"><button class="btn" data-a="avant" aria-label="Image précédente">◀</button><button class="btn fort" data-a="joue" id="joue">▶ Regarder mon histoire</button><button class="btn" data-a="apres" aria-label="Image suivante">▶</button></div>';
   h+='<article class="conte"><h2>'+esc(titre())+'</h2><p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(T.auteur?'Une histoire inventée par '+esc(T.auteur):'')+'<button class="btn" data-a="auteur">✏️ '+(T.auteur?'Changer le prénom':'Écrire mon prénom')+'</button></p>';
   ETAPES.forEach((e,i)=>{h+='<p><small>'+(i+1)+'. '+e.nom+'</small>'+esc(texte(i))+'</p>'});
-  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><button class="btn" data-a="exporte">📤 Fichier à partager</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
+  h+='</article>'+(T.net?'<div class="outils"><button class="btn" data-a="iaTout"'+(IA.n!==null?' disabled':'')+'>✨ Illustrer toute l\'histoire</button><span id="ia-etat" style="align-self:center">'+esc(IA.msg)+'</span></div>':'')+creditHtml()+'<div class="outils"><button class="btn fort" data-a="garde">💾 Sauvegarder</button><button class="btn fort" data-a="imprime">🖨 Imprimer</button><button class="btn fort" data-a="video">🎥 Créer la vidéo</button><span id="sauv-etat" style="align-self:center"></span></div><div class="outils"><button class="btn" data-a="step" data-n="0">✏️ Changer des mots</button><button class="btn" data-a="home">🏠 Accueil</button></div>';
   vue.innerHTML=h;
   prepareImpression();
   archive().catch(()=>{});
@@ -1075,10 +1075,7 @@ function importe(f){
   rd.readAsText(f);
 }
 function telecharge(blob,nom){
-  try{
-    const f=new File([blob],nom,{type:blob.type});
-    if(/iPad|iPhone|Macintosh/.test(navigator.userAgent)&&'ontouchend' in document&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(()=>{});return}
-  }catch(e){}
+  // Téléchargement direct : sur iPad, Safari demande de confirmer puis range le fichier dans le dossier Téléchargements.
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();a.remove();
 }
 
@@ -1141,21 +1138,35 @@ function abandonneVideo(){
   const R=REC;REC=null;if(!R)return;
   R.annule=true;
   try{if(R.rec&&R.rec.state!=='inactive')R.rec.stop()}catch(e){}
-  try{R.stream&&R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop())}catch(e){}
+  try{R.stream&&R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop());R.ac&&R.ac.close()}catch(e){}
   if(R.url)URL.revokeObjectURL(R.url);
 }
 function majBarre(){
   const z=document.getElementById('video-barre');if(!z||!REC)return;
-  if(REC.etat==='prep'){z.innerHTML='<span>Préparation…</span>';return}
+  if(REC.etat==='prep'){z.innerHTML='<span>'+esc(REC.prep||'Préparation…')+'</span><button class="btn" data-a="videoStop">Annuler</button>';return}
   const der=REC.i===REC.pages.length-1;
   z.innerHTML='<span>⏺ Enregistrement · page '+(REC.i+1)+' sur '+REC.pages.length+'</span>'+(REC.voix?'<button class="btn fort" data-a="videoSuite">'+(der?'✔ Terminer':'Page suivante ▶')+'</button>':'')+'<button class="btn" data-a="videoStop">Annuler</button>'+(REC.note?'<span>'+esc(REC.note)+'</span>':'');
 }
 function pageSuivante(){
   const R=REC;if(!R||R.etat!=='rec')return;
-  if(R.i<R.pages.length-1){R.i++;R.t0=performance.now();majBarre()}
+  if(R.i<R.pages.length-1){R.i++;R.t0=performance.now();jouePage(R);majBarre()}
   else{R.etat='stop';try{R.rec.stop()}catch(e){}}
 }
-async function demarreVideo(voix){
+async function sonPage(ac,txt){
+  const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voix:true,texte:txt})});
+  const j=await r.json();
+  if(!j.audio)throw new Error(j.erreur||'vide');
+  const bin=atob(j.audio),u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  return new Promise((ok,ko)=>ac.decodeAudioData(u.buffer,ok,ko));
+}
+function jouePage(R){
+  if(!R.ac)return;
+  const b=R.sons[R.i],src=R.ac.createBufferSource();
+  src.buffer=b;src.connect(R.dest);src.connect(R.ac.destination);src.start();
+  R.duree=b.duration*1000;
+}
+async function demarreVideo(voix,ac,synth){
   // MP4 H.264 en priorité (lisible partout). « video/mp4 » sans précision n'est gardé que pour Safari, où il veut dire H.264.
   const ok=t=>MediaRecorder.isTypeSupported(t);
   let type=null;
@@ -1163,38 +1174,56 @@ async function demarreVideo(voix){
     type=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1.42E01E'].find(ok)||(ok('video/mp4')&&!ok('video/webm')?'video/mp4':null)||['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(ok)||null;
   }
   if(!type){REC={etat:'err',err:'Ce navigateur ne sait pas créer de vidéo. Essaie avec Safari sur iPad, ou avec Chrome.'};return rendVideo()}
-  const R=REC={etat:'prep',voix,type,pages:pagesVideo(),i:0,t0:0,chunks:[]};
+  const KO_VOIX='La voix de l\'ordinateur n\'est pas disponible : pas de connexion, ou service d\'images à mettre à jour. Choisis « Avec ma voix » ou « Sans voix ».';
+  if(synth&&!ac){REC={etat:'err',err:KO_VOIX};return rendVideo()}
+  const R=REC={etat:'prep',voix,type,pages:pagesVideo(),i:0,t0:0,chunks:[],ac,sons:[]};
   rendVideo();
+  if(ac){
+    try{
+      for(let i=0;i<R.pages.length;i++){
+        R.prep='Préparation de la voix : page '+(i+1)+' sur '+R.pages.length+'…';majBarre();
+        const pg=R.pages[i];
+        R.sons.push(await sonPage(ac,pg.type==='titre'&&T.auteur?pg.txt+', par '+T.auteur+'.':pg.txt+(pg.type==='etape'?'':'.')));
+        if(REC!==R){try{ac.close()}catch(e){}return}
+      }
+    }catch(e){try{ac.close()}catch(_){}if(REC===R){REC={etat:'err',err:KO_VOIX};rendVideo()}return}
+  }
   R.imgs=await prepareImgs();
   const cv=document.getElementById('toile-video');if(!cv||REC!==R)return;
   const x=cv.getContext('2d');
   dessinePage(x,R.imgs,R.pages[0],voix?1e9:0);
   try{
     R.stream=cv.captureStream(30);
+    if(ac){R.dest=ac.createMediaStreamDestination();R.dest.stream.getAudioTracks().forEach(t=>R.stream.addTrack(t))}
     if(voix){try{R.mic=await navigator.mediaDevices.getUserMedia({audio:true});R.mic.getAudioTracks().forEach(t=>R.stream.addTrack(t))}catch(e){R.voix=false;R.note='Le micro n\'est pas disponible : la vidéo sera sans voix.'}}
     if(REC!==R)return;
     R.rec=new MediaRecorder(R.stream,{mimeType:type,videoBitsPerSecond:3000000});
   }catch(e){REC={etat:'err',err:'La vidéo n\'a pas pu démarrer sur cet appareil.'};return rendVideo()}
   R.rec.ondataavailable=e=>{if(e.data&&e.data.size)R.chunks.push(e.data)};
   R.rec.onstop=()=>{
-    try{R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop())}catch(e){}
+    try{R.stream.getTracks().forEach(t=>t.stop());R.mic&&R.mic.getTracks().forEach(t=>t.stop());R.ac&&R.ac.close()}catch(e){}
     if(R.annule)return;
     R.blob=new Blob(R.chunks,{type:type.split(';')[0]});R.url=URL.createObjectURL(R.blob);R.etat='fini';
     if(REC===R&&T.view==='video')rendVideo();
   };
-  R.rec.start();R.etat='rec';R.t0=performance.now();majBarre();
+  R.rec.start();R.etat='rec';R.t0=performance.now();jouePage(R);majBarre();
   const boucle=()=>{
     if(REC!==R||R.etat!=='rec')return;
     const pg=R.pages[R.i],dt=performance.now()-R.t0,n=pg.txt.split(' ').length;
-    dessinePage(x,R.imgs,pg,R.voix?1e9:Math.floor(dt/400));
-    if(!R.voix&&dt>Math.max(2600,n*400+1600))pageSuivante();
+    if(R.ac){
+      dessinePage(x,R.imgs,pg,Math.ceil(n*Math.min(1,dt/R.duree)));
+      if(dt>R.duree+900)pageSuivante();
+    }else{
+      dessinePage(x,R.imgs,pg,R.voix?1e9:Math.floor(dt/400));
+      if(!R.voix&&dt>Math.max(2600,n*400+1600))pageSuivante();
+    }
     requestAnimationFrame(boucle);
   };
   boucle();
 }
 function rendVideo(){
   let h='<h2 class="q">🎥 La vidéo de mon histoire</h2>';
-  if(!REC)h+='<p style="margin:0">La vidéo montre les pages de ton histoire, une par une, comme un livre.</p><div class="outils"><button class="btn fort" data-a="videoGo" data-v="1">🎤 Avec ma voix : je lis mon histoire</button><button class="btn fort" data-a="videoGo" data-v="0">🔇 Sans voix</button></div><p style="margin:0">Avec ta voix, tu lis la page à voix haute, puis tu touches « Page suivante ».</p><div class="outils"><button class="btn" data-a="film">← Retour au film</button></div>';
+  if(!REC)h+='<p style="margin:0">La vidéo montre les pages de ton histoire, une par une, comme un livre.</p><div class="outils"><button class="btn fort" data-a="videoGo" data-v="1">🎤 Avec ma voix : je lis mon histoire</button>'+(T.net?'<button class="btn fort" data-a="videoGo" data-v="2">🔊 Avec la voix de l\'ordinateur</button>':'')+'<button class="btn fort" data-a="videoGo" data-v="0">🔇 Sans voix</button></div><p style="margin:0">Avec ta voix, tu lis la page à voix haute, puis tu touches « Page suivante ». La voix de l\'ordinateur a besoin d\'une connexion.</p><div class="outils"><button class="btn" data-a="film">← Retour au film</button></div>';
   else if(REC.etat==='err')h+='<p style="margin:0">'+esc(REC.err)+'</p><div class="outils"><button class="btn" data-a="film">← Retour au film</button></div>';
   else if(REC.etat==='fini'){
     const mp4=/mp4/.test(REC.blob.type);
@@ -1260,10 +1289,18 @@ const ACT={
   supprH(el){BIB.suppr=+el.dataset.id;rendBiblio()},
   supprNon(){BIB.suppr=null;rendBiblio()},
   async supprOui(el){try{await bdOp('readwrite',st=>st.delete(+el.dataset.id))}catch(e){}BIB.suppr=null;rendBiblio()},
-  garde(){const m=t=>{const z=document.getElementById('sauv-etat');if(z)z.textContent=t};archive().then(ok=>m(ok?'Histoire sauvegardée ✔':'Rien à sauvegarder.'),()=>m('La sauvegarde n\'est pas possible ici.'))},
+  garde(){
+    const m=t=>{const z=document.getElementById('sauv-etat');if(z)z.textContent=t};
+    ACT.exporte();
+    archive().then(()=>m('Histoire enregistrée dans « Mes histoires » et dans le dossier Téléchargements.'),()=>m('Fichier enregistré dans le dossier Téléchargements.'));
+  },
   exporte(){telecharge(new Blob([JSON.stringify({adaptconte:1,titre:titre(),data:copie()})],{type:'application/json'}),nomFichier()+'.adaptconte.json')},
   video(){tais();REC=null;T.view='video';rend()},
-  videoGo(el){demarreVideo(el.dataset.v==='1')},
+  videoGo(el){
+    let ac=null;
+    if(el.dataset.v==='2'){try{ac=new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){ac=null}}
+    demarreVideo(el.dataset.v==='1',ac,el.dataset.v==='2');
+  },
   videoSuite(){pageSuivante()},
   videoStop(){abandonneVideo();rendVideo()},
   videoRefaire(){abandonneVideo();rendVideo()},
@@ -1287,6 +1324,11 @@ const ACT={
     }catch(e){
       res.push([false,'Images par IA : service injoignable depuis cette page. Soit le service adaptconte-images n\'est pas encore créé sur Cloudflare, soit cette page n\'est pas ouverte depuis GitHub Pages ou boussoleebep.fr (adresse actuelle : '+(location.protocol==='file:'?'fichier sur l\'appareil':location.origin)+'), soit le réseau bloque workers.dev.']);
     }
+    try{
+      const r=await fetch(T.urlIA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voix:true,texte:'Bonjour.'})});
+      const j=await r.json().catch(()=>({}));
+      res.push(j.audio?[true,'Voix de l\'ordinateur pour la vidéo : ça marche.']:[false,'Voix de l\'ordinateur pour la vidéo : pas encore disponible. Il faut coller le nouveau code dans Cloudflare. Détail : '+(j.erreur||r.status)]);
+    }catch(e){res.push([false,'Voix de l\'ordinateur pour la vidéo : service injoignable depuis cette page.'])}
     z.textContent='';res.forEach(x=>ligne(x[0],x[1]));
   },
   pictoNon(){T.pictos[DR.id].src='';DR=null;T.view='recap';rend()},
